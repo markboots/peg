@@ -1,8 +1,11 @@
 #include "PEG.h"
+#include "PESolver.h"
+
 #include <gsl/gsl_complex_math.h>
 
 PEResult PEGrating::getEff(double incidenceDeg, double wl, const PEMathOptions& mo) const {
-	return PEResult();
+	PESolver s(*this, mo);
+	return s.getEff(incidenceDeg, wl);
 }
 
 gsl_complex PEGrating::refractiveIndex(double wl) const {
