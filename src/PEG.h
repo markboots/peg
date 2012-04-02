@@ -65,7 +65,7 @@ public:
 	
 	
 	/// Returns the complex refractive index at a given wavelength \c wl in um. \todo Imp. Current is Pt at 410 eV.
-	gsl_complex refractiveIndex(double wl) const { return gsl_complex_rect(0.993, -0.00754); }
+	gsl_complex refractiveIndex(double wl) const;
 	
 	
 	/// Calculates the grating efficiency at a given incidence angle \c incidenceDeg (degrees) and wavelength \c wl (um).

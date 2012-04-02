@@ -1,5 +1,11 @@
+#include "PEG.h"
+#include <gsl/gsl_complex_math.h>
 
-// Calculates the grating efficiency at a given incidence angle \c incidenceDeg (degrees) and wavelength \c wl (um).
 PEResult PEGrating::getEff(double incidenceDeg, double wl, const PEMathOptions& mo) const {
-	return PEResult;
+	return PEResult();
 }
+
+gsl_complex PEGrating::refractiveIndex(double wl) const {
+	return gsl_complex_rect(0.993, -0.00754);
+}
+

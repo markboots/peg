@@ -1,13 +1,14 @@
 INCLUDEPATH=/home/mjb865/include
+LIBPATH=/home/mjb865/lib
 CC=g++
 CFLAGS=-c -Wall -I$(INCLUDEPATH)
-LDFLAGS=-lgsl
+LDFLAGS=-L$(LIBPATH) -lgsl -lgslcblas
 SOURCES=main.cpp PEG.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 
-all: $(SOURCES) pegSerial
+all: $(SOURCES) ../build/pegSerial
 
-pegSerial: $(OBJECTS)
+../build/pegSerial: $(OBJECTS)
 	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
 
 .cpp.o:
