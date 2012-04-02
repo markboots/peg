@@ -5,6 +5,7 @@
 #include <gsl/gsl_complex.h>
 
 #include <string>
+#include <vector>
 
 // Common definitions for the PEG parallel grating efficiency library
 
@@ -13,11 +14,13 @@
 class PEResult {
 public:
 	enum ResultCode { Success, InvalidGratingFailure, ConvergenceFailure, InsufficientCoefficientsFailure };
+	
 	ResultCode status;
 	std::vector<double> insideEff;
 	std::vector<double> outsideEff;
 };
 
+/// Represents the numerical options to be used for a single grating calculation.
 class PEMathOptions {
 public:
 	/// Fourier truncation index N. Should be a positive number.
@@ -81,7 +84,7 @@ protected:
 	
 };
 
-class PEBlazedGrating {
+class PEBlazedGrating : public PEGrating {
 public:
 	/// Constructs a grating with the blazed profile. The required geometry parameters are \c blazeAngleDeg, the blaze angle in deg., and the anti-blaze angle \c antiBlazeAngle
 	PEBlazedGrating(double period = 1.0, double blazeAngleDeg = 2.0, double antiBlazeAngleDeg = 30, const std::string& material = "Au") {

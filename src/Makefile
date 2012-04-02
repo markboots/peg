@@ -1,5 +1,6 @@
+INCLUDEPATH=/home/mjb865/include
 CC=g++
-CFLAGS=-c -Wall
+CFLAGS=-c -Wall -I$(INCLUDEPATH)
 LDFLAGS=-lgsl
 SOURCES=main.cpp PEG.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
