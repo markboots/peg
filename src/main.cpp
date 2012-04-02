@@ -1,9 +1,9 @@
 #include "PEG.h"
 
-/// This function tests a serial calculation of blazed grating efficiency.
+/// This function tests a single calculation of blazed grating efficiency.
 int main(int argc, const char** argv) {
 	
-	PEBlazedGrating blazedGrating();
+	PEBlazedGrating blazedGrating;
 	
 	PEResult r = blazedGrating.getEff();
 	
