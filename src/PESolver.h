@@ -25,8 +25,19 @@ public:
 	/*! Note: This is different than the usual branch cut defined for the "principal square root", which uses the negative real axis so that Re(w) >= 0 [ie: w is in the right complex plane].*/
 	static gsl_complex complex_sqrt_upperComplexPlane(gsl_complex z);
 	
-	/// Calculates the grating fourier expansion for k^2 at a given \c y value and wavelength \c wl, and stores in \c k2.  \c k2 must have space for 4*N_ + 1 coefficients, since we will be computing from n = -2N_ to 2N.   Reads member variables N_, grating refractive index \c v_1_, and grating geometry from \c g_.  Returns PEResult::Success, or PEResult::InvalidGratingFailure if the profile is not supported or \c y is larger than the groove height.
-	PEResult::Code computeGratingExpansion(double y, double wl, gsl_complex* k2) const;
+	/// Calculates the grating fourier expansion for k^2 at a given \c y value and wavelength \c wl, and stores in \c k2.  \c k2 must have space for 4*N_ + 1 coefficients, since we will be computing from n = -2N_ to 2N.   Reads member variables N_, wavelength wl_, grating refractive index \c v_1_, and grating geometry from \c g_.  Returns PEResult::Success, or PEResult::InvalidGratingFailure if the profile is not supported or \c y is larger than the groove height.
+	PEResult::Code computeGratingExpansion(double y, gsl_complex* k2) const;
+	
+	/// integrates the complex vectors \c u and \c uprime from y=0 to y=a, using the differential equation and ______ method.  Calls computeGratingExpansion() at each y value, so reads member variables N_, v_1_, and g_.  Modifies k2_ at each step.  Results are returned in-place.
+	PEResult::Code integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl_vector_complex* uprime);
+	
+	/// The function callback for the integration process.  Must be static so we have an address for it, so \c peSolver will be a pointer to a solver (this).
+	static int odeFunctionCB(double y, const double w[], double f[], void* peSolver) { 
+		PESolver* s = static_cast<PESolver*>(peSolver);
+		return s->odeFunction(y, w, f);
+	}
+	// called to compute the values for the integration process. \todo Comment.
+	int odeFunction(double y, const double w[], double f[]);
 	
 protected:
 
@@ -54,7 +65,9 @@ protected:
 	
 	// matrix T, used to solve the linear system 
 	
-	// refractive index of the grating material
+	// wavelength for the current calculation
+	double wl_;
+	// refractive index of the grating material, at wl_
 	gsl_complex v_1_;
 	
 	// a reference to the grating we're solving

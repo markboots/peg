@@ -13,7 +13,10 @@
 /// This type is returned by a single grating efficiency calculation. It contains a status code/error code to indicate the result of the calculation, a vector of inside order efficiencies, and a vector of outside order efficiencies. The first element in the output vectors is the 0 order, and is duplicated over both.
 class PEResult {
 public:
-	enum Code { Success, InvalidGratingFailure, ConvergenceFailure, InsufficientCoefficientsFailure };
+	enum Code { Success, InvalidGratingFailure, ConvergenceFailure, InsufficientCoefficientsFailure, OtherFailure };
+	
+	/// Constructs an empty result with the given \c statusCode
+	PEResult(Code statusCode = OtherFailure) { status = statusCode; }
 	
 	Code status;
 	std::vector<double> insideEff;
@@ -50,6 +53,8 @@ public:
 		material_ = "Au";
 	}
 	
+	virtual ~PEGrating() {}
+	
 	// Accessor Functions
 	////////////////////////
 	
@@ -59,6 +64,8 @@ public:
 	double period() const { return period_; }
 	/// Returns profile-dependent geometry parameters
 	double geo(int parameterIndex) const { return geo_[parameterIndex]; }
+	/// Returns the height from the bottom of the grooves to the top of the grooves.  Profile-dependent.
+	virtual double height() const;
 	
 	/// Returns the grating material code (ex: "Ni", "Au", etc.)
 	std::string material() const { return material_; }

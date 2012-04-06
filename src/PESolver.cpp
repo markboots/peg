@@ -2,6 +2,9 @@
 
 #include <math.h>
 #include <gsl/gsl_complex_math.h>
+#include <gsl/gsl_odeiv2.h>
+#include <gsl/gsl_errno.h>
+
 
 /// Speed of light in um/s.
 #define M_c 2.99792458e14
@@ -39,8 +42,10 @@ PESolver::~PESolver() {
 /// \todo Imp.
 PEResult PESolver::getEff(double incidenceDeg, double wl) {
 	
+	// Set this as the current wavelength
+	wl_ = wl;
 	// get refractive index at wavelength
-	v_1_ = g_.refractiveIndex(wl);
+	v_1_ = g_.refractiveIndex(wl_);
 	
 	// incidence angle in radians
 	double theta_2 = incidenceDeg * M_PI / 180;
@@ -91,10 +96,11 @@ PEResult PESolver::getEff(double incidenceDeg, double wl) {
 		gsl_vector_complex_view uprime = gsl_matrix_complex_column(uprime_, i);
 		
 		// need to integrate u and uprime along y, using d^2 u/dy^2 = M(y) u
+		PEResult::Code err = integrateTrialSolutionAlongY(&u.vector, &uprime.vector);
+		if(err != PEResult::Success)
+			return PEResult(err);
 		
-		// integrate over y
-			// compute M(y)
-		// get u(a) and u'(a)
+		// Now we have u(a) and u'(a) in (u, uprime) and in the columns of the actual (u_, uprime_) matrices.
 	}
 	
 	// construct Ax = b matrices
@@ -117,7 +123,7 @@ gsl_complex PESolver::complex_sqrt_upperComplexPlane(gsl_complex z) {
 	return w;
 }
 
-PEResult::Code PESolver::computeGratingExpansion(double y, double wl, gsl_complex* k2) const {
+PEResult::Code PESolver::computeGratingExpansion(double y, gsl_complex* k2) const {
 	// For the simple supported profiles, we will always have an x1 value where the line at y enters the grating material, and an x2 value where the line exits the grating material.  Both x1 and x2 > 0, < d.
 	double x1, x2;
 	// grating period:
@@ -142,6 +148,9 @@ PEResult::Code PESolver::computeGratingExpansion(double y, double wl, gsl_comple
 		// For blazed profiles, geo(0) is the blaze angle, and geo(1) is the anti-blaze angle, both in degrees.
 		double blaze = g_.geo(0)*M_PI/180.0;
 		double antiBlaze = g_.geo(1)*M_PI/180.0;
+		
+		if(blaze <= 0 || blaze >= M_PI_2 || antiBlaze <= 0 || antiBlaze > M_PI_2)
+			return PEResult::InvalidGratingFailure;
 		
 		x1 = y / tan(blaze);
 		x2 = d - y / tan(antiBlaze);
@@ -172,7 +181,7 @@ PEResult::Code PESolver::computeGratingExpansion(double y, double wl, gsl_comple
 	}
 	
 	// wave number in free space: k_2 = v_2 * w / c.  v_2 = 1 in empty space, so k_2 = 2pi / wl.
-	gsl_complex k_2 = gsl_complex_rect(2 * M_PI / wl, 0);
+	gsl_complex k_2 = gsl_complex_rect(2 * M_PI / wl_, 0);
 	// wave number in the grating: k_1 = v_1 * w / c = v_1 * 2pi / wl = v_1 * k_2.
 	gsl_complex k_1 = gsl_complex_mul(v_1_, k_2);
 	
@@ -212,4 +221,93 @@ PEResult::Code PESolver::computeGratingExpansion(double y, double wl, gsl_comple
 	}
 	
 	return PEResult::Success;
+}
+
+PEResult::Code PESolver::integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl_vector_complex* uprime) {
+	// define ode solving system, with our function to evaluate dw/dy, no Jacobian, and 8*N_+4 components.
+	gsl_odeiv2_system odeSys = {odeFunctionCB, 0, 8*N_+4, this};
+	
+	// initial starting step in y: choose grating height / 200.
+	double gratingHeight = g_.height();
+	double hStart = gratingHeight / 200.0;
+	
+	// setup driver
+	gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_y_new (&odeSys, gsl_odeiv2_step_rkf45, hStart, 1e-8, 0.0);	/// \todo Use standard (y, yp) instead of y error control?  What tolerances?
+	
+	// fill starting conditions from u, uprime
+	double* w = new double[8*N_+4];
+	int fourNp2 = 4*N_+2;
+	for(int i=0; i<twoNp1_; ++i) {
+		gsl_complex u_n = gsl_vector_complex_get(u, i);
+		w[2*i] = GSL_REAL(u_n);
+		w[2*i + 1] = GSL_IMAG(u_n);
+		
+		gsl_complex uprime_n = gsl_vector_complex_get(uprime, i);
+		w[2*i + fourNp2] = GSL_REAL(uprime_n);
+		w[2*i + fourNp2 + 1] = GSL_IMAG(uprime_n);
+	}
+	
+	// run it: integrate from y = 0 to gratingHeight.
+	double y = 0;
+	int status = gsl_odeiv2_driver_apply (d, &y, gratingHeight, w);
+	if (status != GSL_SUCCESS) {
+		return PEResult::ConvergenceFailure;
+	}
+	
+	// copy results back into u, uprime
+	for(int i=0; i<twoNp1_; ++i) {
+		gsl_vector_complex_set(u, i, gsl_complex_rect(w[2*i], w[2*i + 1]));
+		gsl_vector_complex_set(uprime, i, gsl_complex_rect(w[2*i + fourNp2], w[2*i + fourNp2 + 1]));
+	}
+	
+	delete [] w;	
+	return PEResult::Success;
+}
+
+int PESolver::odeFunction(double y, const double w[], double f[]) {
+	
+	// w contains the last values of u_n{re, im} and u'_n{re, im}, in that order.
+	// need to compute f = dw/dy.
+	
+	// get k2_n at this y value.
+	if(computeGratingExpansion(y, k2_) != PEResult::Success) {
+		return GSL_EBADFUNC;	// can't calculate here. Invalid profile? y above the profile height?
+	}
+	
+	// size is (2N+1)x2x2, ie: 8N+4.
+	for(int i=0, eightNp4=8*N_+4; i<eightNp4; ++i) {
+		int fourNp2 = 4*N_+2;	// fourNp2 divides the top and bottom of the arrays w, f.  Top of w is u; bottom of w is u' = v.   Top of f is u' = v;  bottom of f is v' = u''.
+		
+		if(i < fourNp2) {
+			// working on computing u'_n = v. [top of f array]. Just copy from v = u' = [bottom half of w array]
+			f[i] = w[i + fourNp2];
+		}
+		
+		else {
+			// working on computing v'_n = u''_n [bottom of f array].  We'll handle real and imaginary components at once, so only do this if i is even.
+			if(i%2 == 0) {
+				int n = (i - fourNp2)/2 - N_;
+				gsl_complex upp_n = gsl_complex_rect(0,0);	// initialize sum to 0.
+				// loop over m.  Retrieving u_n values from top of array.
+				for(int j=0; j<fourNp2; ++j) {
+					if(j%2 == 0) {	// also handling real and imaginary components at once.
+						int m = j/2 - N_;
+					
+						gsl_complex u_m = gsl_complex_rect(w[j], w[j+1]);
+						
+						gsl_complex minus_k2 = gsl_complex_mul_real(k2_[n-m + 2*N_], -1.0);	// k2_ ranges from -2N to 2N.
+						if(n == m)
+							minus_k2 = gsl_complex_add_real(minus_k2, alpha_[n + N_]);
+						
+						upp_n = gsl_complex_add(upp_n, gsl_complex_mul(minus_k2, u_m));
+					}
+				}
+				
+				f[i] = GSL_REAL(upp_n);
+				f[i+1] = GSL_IMAG(upp_n);
+			}
+		}
+	}
+	
+	return GSL_SUCCESS;
 }
