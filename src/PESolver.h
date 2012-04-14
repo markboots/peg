@@ -4,6 +4,7 @@
 #include "PEG.h"
 #include <gsl/gsl_complex.h>
 #include <gsl/gsl_matrix_complex_double.h>
+#include <gsl/gsl_linalg.h>
 
 /// Contains the context (memory structures, etc.) and algorithm for solving the grating efficiency.
 
@@ -62,9 +63,22 @@ protected:
 	gsl_matrix_complex* u_;
 	// matrix u' = du/dy.  Columns are across trial solutions (p), rows are fourier coefficients n.
 	gsl_matrix_complex* uprime_;
+	// This is a diagonal matrix that will have components 1/(i*beta2_n), required in the calculation of the T matrix.
+	gsl_matrix_complex* iBeta2Diag_;
+	// This is the T matrix that relates the input and ouput basis expansion of the grating.
+	gsl_matrix_complex* T_;
+	// This vector describes the incident light in the basis expansion
+	gsl_vector_complex* Vincident_;
+	// This vector contains the rayleigh coefficients A^(1)_n, which also contain the constants of the linear superposition.  T_ A1_ = Vincident_  is an A x = b linear system, that we need to solve for A1_.
+	gsl_vector_complex* A1_;
 	
-	// matrix T, used to solve the linear system 
+	// A permutation structure (size 2*N + 1) used to solve the linear system.
+	gsl_permutation* permutation_;
 	
+	// This vector contains the rayleigh coefficients B^(2)_n, which are essentially the output of the grating solver.
+	gsl_vector_complex* B2_;
+	
+		
 	// wavelength for the current calculation
 	double wl_;
 	// refractive index of the grating material, at wl_

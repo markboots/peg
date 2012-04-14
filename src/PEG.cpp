@@ -30,3 +30,36 @@ double PEGrating::height() const {
 	default: return 0;
 	}
 }
+
+
+std::ostream& operator<<(std::ostream& os, const PEResult& result) {
+	switch(result.status) {
+	case PEResult::Success:
+		os << "Inside Orders" << std::endl; 
+		for(int i=0,cc=result.insideEff.size(); i<cc; ++i) {
+			os << i << "\t" << result.insideEff.at(i) << std::endl;
+		}
+		os << "\nOutside Orders" << std::endl; 
+		for(int i=0,cc=result.outsideEff.size(); i<cc; ++i) {
+			os << i << "\t" << result.outsideEff.at(i) << std::endl;
+		}
+		break;
+	case PEResult::InvalidGratingFailure:
+		os << "Error: Invalid Grating" << std::endl;
+		break;
+	case PEResult::ConvergenceFailure:
+		os << "Error: Integration Convergence Failure" << std::endl;
+		break;
+	case PEResult::InsufficientCoefficientsFailure:
+		os << "Error: Insufficient Coefficients" << std::endl;
+		break;
+	case PEResult::AlgebraError:
+		os << "Error: Linear Algebra Error" << std::endl;
+		break;
+	case PEResult::OtherFailure:
+		os << "Error: Unknown other Failure" << std::endl;
+		break;
+	}
+	
+	return os;
+}

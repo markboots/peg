@@ -6,6 +6,7 @@
 
 #include <string>
 #include <vector>
+#include <ostream>
 
 // Common definitions for the PEG parallel grating efficiency library
 
@@ -13,15 +14,26 @@
 /// This type is returned by a single grating efficiency calculation. It contains a status code/error code to indicate the result of the calculation, a vector of inside order efficiencies, and a vector of outside order efficiencies. The first element in the output vectors is the 0 order, and is duplicated over both.
 class PEResult {
 public:
-	enum Code { Success, InvalidGratingFailure, ConvergenceFailure, InsufficientCoefficientsFailure, OtherFailure };
+	enum Code { Success, InvalidGratingFailure, ConvergenceFailure, InsufficientCoefficientsFailure, AlgebraError, OtherFailure };
 	
 	/// Constructs an empty result with the given \c statusCode
 	PEResult(Code statusCode = OtherFailure) { status = statusCode; }
+	/// Constructs a successful result, where insideEff and outsideEff have size \c N+1.
+	PEResult(int N) : insideEff(N+1), outsideEff(N+1) {
+		status = Success;
+	}
 	
 	Code status;
+	double wavelength;
+	double incidenceDeg;
 	std::vector<double> insideEff;
 	std::vector<double> outsideEff;
+	
+	/// Prints the output efficiencies in a table, to standard output.
+	friend std::ostream& operator<<(std::ostream& os, const PEResult& result);
 };
+
+std::ostream& operator<<(std::ostream& os, const PEResult& result);
 
 /// Represents the numerical options to be used for a single grating calculation.
 class PEMathOptions {

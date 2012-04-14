@@ -4,10 +4,16 @@
 #include <gsl/gsl_complex_math.h>
 #include <gsl/gsl_odeiv2.h>
 #include <gsl/gsl_errno.h>
+#include <gsl/gsl_cblas.h>
+#include <gsl/gsl_blas.h>
 
+#include <iostream>
 
 /// Speed of light in um/s.
 #define M_c 2.99792458e14
+
+// Turn debug output on or off
+#define printDebugOutput 1
 
 PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo)
 	: g_(grating)
@@ -20,6 +26,14 @@ PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo)
 	// allocate matrices and vectors
 	u_ = gsl_matrix_complex_alloc(twoNp1_, twoNp1_);
 	uprime_ = gsl_matrix_complex_alloc(twoNp1_, twoNp1_);
+	iBeta2Diag_ = gsl_matrix_complex_alloc(twoNp1_, twoNp1_);
+	T_ = gsl_matrix_complex_alloc(twoNp1_, twoNp1_);
+	gsl_matrix_complex_set_zero(iBeta2Diag_);
+	Vincident_ = gsl_vector_complex_alloc(twoNp1_);
+	gsl_vector_complex_set_zero(Vincident_);
+	A1_ = gsl_vector_complex_alloc(twoNp1_);
+	permutation_ = gsl_permutation_alloc(twoNp1_);
+	B2_ = gsl_vector_complex_alloc(twoNp1_);
 	
 	alpha_ = new double[twoNp1_];
 	beta2_ = new gsl_complex[twoNp1_];
@@ -32,6 +46,12 @@ PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo)
 PESolver::~PESolver() {
 	gsl_matrix_complex_free(u_);
 	gsl_matrix_complex_free(uprime_);
+	gsl_matrix_complex_free(iBeta2Diag_);
+	gsl_matrix_complex_free(T_);
+	gsl_vector_complex_free(Vincident_);
+	gsl_vector_complex_free(A1_);
+	gsl_permutation_free(permutation_);
+	gsl_vector_complex_free(B2_);
 	
 	delete [] alpha_;
 	delete [] beta2_;
@@ -41,6 +61,11 @@ PESolver::~PESolver() {
 
 /// \todo Imp.
 PEResult PESolver::getEff(double incidenceDeg, double wl) {
+	
+	int errCode;
+	
+	// 1. Setup incidence variables and constants
+	/////////////////////////////////////////
 	
 	// Set this as the current wavelength
 	wl_ = wl;
@@ -59,7 +84,18 @@ PEResult PESolver::getEff(double incidenceDeg, double wl) {
 	// grating period:
 	double d = g_.period();
 	
-	// compute all alpha_n and beta_n.  (This could be a parallel loop)
+	// temporary complex variable for doing calculations
+	gsl_complex z;
+	// the height of the grating (in um)
+	double a = g_.height();
+	
+	if(printDebugOutput) {
+		std::cout << "\nGrating height a (um): " << a << std::endl;
+	}
+	
+	// 2. compute all alpha_n and beta1_n, beta2_n.  (This could be a parallel loop)
+	///////////////////////////////////
+	
 	for(int i=0; i<twoNp1_; i++) {
 		int n = i - N_;
 		
@@ -78,14 +114,31 @@ PEResult PESolver::getEff(double incidenceDeg, double wl) {
 		beta1_[i] = complex_sqrt_upperComplexPlane(k12minusAn2);
 	}
 	
-	// set up trial solutions at y=0.
+	if(printDebugOutput) {
+		std::cout << "\nbeta1_n:" << std::endl;
+		for(int i=0; i<twoNp1_; ++i) {
+			std::cout << i - N_ << ":\t" << GSL_REAL(beta1_[i]) << "\t\t" << GSL_IMAG(beta1_[i]) << std::endl;
+		}
+	}
+	
+	if(printDebugOutput) {
+		std::cout << "\nbeta2_n:" << std::endl;
+		for(int i=0; i<twoNp1_; ++i) {
+			std::cout << i - N_ << ":\t" << GSL_REAL(beta2_[i]) << "\t\t" << GSL_IMAG(beta2_[i]) << std::endl;
+		}
+	}
+	
+	// 3. set up trial solutions at y=0, and then integrate their ODEs from y=0 to y=a.
+	////////////////////////////////////////
+	
 	// u_ should be the identify matrix
 	gsl_matrix_complex_set_identity(u_);
 	// zero uprime_, before we set the components we need to.
 	gsl_matrix_complex_set_zero(uprime_);
+	
 	// Loop over all trial solutions p:  [row: n.  col: p]
 	for(int i=0; i<twoNp1_; i++) {
-		int p = i - N_;
+		// int p = i - N_;
 		
 		// insert initial values at y=0.  u'(0) = 1* \delta_{np}.  (Already set: identity matrix)
 		// u'(0) = -i * beta^(1)_n \delta_{np}
@@ -99,16 +152,98 @@ PEResult PESolver::getEff(double incidenceDeg, double wl) {
 		PEResult::Code err = integrateTrialSolutionAlongY(&u.vector, &uprime.vector);
 		if(err != PEResult::Success)
 			return PEResult(err);
-		
-		// Now we have u(a) and u'(a) in (u, uprime) and in the columns of the actual (u_, uprime_) matrices.
 	}
 	
-	// construct Ax = b matrices
-	// solve for An
-	// construct Ax = b matrices
-	// solve for Bn
+	// Now we have u(a) and u'(a) in (u, uprime) and in the columns of the actual (u_, uprime_) matrices.
 	
-	return PEResult();	
+	// 4. Need to calculate the T matrix that maps the grating input to grating output (in the basis expansion)
+	/////////////////////////////
+	
+	// Need a diagonal matrix with components 1/(i*beta2_n).
+	for(int i=0; i<twoNp1_; ++i) {
+		gsl_matrix_complex_set(iBeta2Diag_, i, i, gsl_complex_inverse(gsl_complex_mul_imag(beta2_[i], 1.0)));
+	}
+	
+	// WRONG!: The T matrix is = 0.5 * (u_ - iBeta2Diag_*uprime_).  Compute and store back in T_.
+	// The actual matrix should be (i*beta2_n u - uprime)
+	// copy u_ into T_.
+	gsl_matrix_complex_memcpy(T_, u_);
+	// [This function computes C = \alpha A B + \beta C, when A is symmetric.  We will compute it for A = iBeta2Diag_, B = uprime_, \alpha = -0.5, \beta = 0.5, and C = u_ = T_.]
+	errCode = gsl_blas_zsymm(CblasLeft, CblasUpper, gsl_complex_rect(-0.5,0), iBeta2Diag_, uprime_, gsl_complex_rect(0.5,0), T_);
+	if(errCode) return PEResult(PEResult::AlgebraError);
+	
+	// 5. Set up the input (incidence) basis vector Vincident_
+	/////////////////////////////
+	
+	// fill out the incidence matrix Vincident_: when n=0, Vincident_0 = i(beta2_0 + beta1_0)*exp(-i*beta2_0*a). For all other n, Vincident_ = 0 (still).
+	z = gsl_complex_mul_imag(gsl_complex_mul(gsl_complex_add(beta2_[N_], beta1_[N_]), gsl_complex_exp(gsl_complex_mul_imag(beta2_[N_], -a))), 1.0);
+	if(printDebugOutput) {
+		std::cout << "\nIncident vector component V_0: " << GSL_REAL(z) << " " << GSL_IMAG(z) << std::endl;
+	}
+	gsl_vector_complex_set(Vincident_, N_, z);
+	
+	// 6. Now we have a linear system:  T_ A1_ = Vincident_.   Solve for A1_, using standard LU decomposition.
+	///////////////////////////////
+	
+	int s;
+	errCode = gsl_linalg_complex_LU_decomp(T_, permutation_, &s);
+	if(errCode) return PEResult(PEResult::AlgebraError);
+	errCode = gsl_linalg_complex_LU_solve(T_, permutation_, Vincident_, A1_);
+	if(errCode) return PEResult(PEResult::AlgebraError);
+	
+	if(printDebugOutput) {
+		std::cout << "\nA1_:" << std::endl;
+		for(int i=0; i<twoNp1_; ++i) {
+			std::cout << i - N_ << ":\t" << GSL_REAL(gsl_vector_complex_get(A1_, i)) << "\t\t" << GSL_IMAG(gsl_vector_complex_get(A1_, i)) << std::endl;
+		}
+	}
+	
+	// 7. Solve for the reflected Rayleigh coefficients B2_.
+	////////////////////////////////
+	
+	// Now we have A1_.  Need to get B2_.  From eqn. II.18, \sum_p { A^(1)_p u_{np}(a) } - A2_0 exp(-i beta2_0 a) \delta_{n,0} = B2_n exp(-i beta2_n a)
+	// The sum can be computed by the matrix-vector multiplication (u_ A1_).
+	errCode = gsl_blas_zgemv(CblasNoTrans, gsl_complex_rect(1,0), u_, A1_, gsl_complex_rect(0,0), B2_);
+	if(errCode) return PEResult(PEResult::AlgebraError);
+	// now we need to subtract exp(-i beta2_0 a) when n = 0:
+	gsl_complex temp = gsl_complex_exp(gsl_complex_mul_imag(beta2_[N_], -a));
+	temp = gsl_complex_sub(gsl_vector_complex_get(B2_, N_), temp);
+	gsl_vector_complex_set(B2_, N_, temp);
+	// and then divide by exp(i beta2_n a) for all n.
+	for(int i=0; i<twoNp1_; ++i) {
+		temp = gsl_complex_exp(gsl_complex_mul_imag(beta2_[i], a));
+		temp = gsl_complex_div(gsl_vector_complex_get(B2_, i), temp);
+		gsl_vector_complex_set(B2_, i, temp);
+	}
+	
+	if(printDebugOutput) {
+		std::cout << "\nB2_:" << std::endl;
+		for(int i=0; i<twoNp1_; ++i) {
+			std::cout << i - N_ << ":\t" << GSL_REAL(gsl_vector_complex_get(B2_, i)) << "\t\t" << GSL_IMAG(gsl_vector_complex_get(B2_, i)) << std::endl;
+		}
+	}
+	
+	// 8. Now we have B2_. Compute efficiency and put into result structure.
+	////////////////////////////////////////
+	
+	PEResult result(N_);
+	result.wavelength = wl_;
+	result.incidenceDeg = incidenceDeg;
+	
+	for(int i=0; i<twoNp1_; ++i) {
+		int n = i - N_;
+		double eff = gsl_complex_abs2(gsl_vector_complex_get(B2_, i))*GSL_REAL(beta2_[i])/GSL_REAL(beta2_[N_]);
+		// is this a non-propagating order?  Then the real part of beta2_n will be exactly 0, so the efficiency will come out as 0.
+		
+		if(n <= 0) {
+			result.insideEff[-n] = eff;
+		}
+		if(n >= 0) {
+			result.outsideEff[n] = eff;
+		}
+	}
+	
+	return result;
 }
 
 gsl_complex PESolver::complex_sqrt_upperComplexPlane(gsl_complex z) {
@@ -232,7 +367,7 @@ PEResult::Code PESolver::integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl
 	double hStart = gratingHeight / 200.0;
 	
 	// setup driver
-	gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_y_new (&odeSys, gsl_odeiv2_step_rkf45, hStart, 1e-8, 0.0);	/// \todo Use standard (y, yp) instead of y error control?  What tolerances?
+	gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_standard_new (&odeSys, gsl_odeiv2_step_rkf45, hStart, 0, 0.00001, 0.5, 0.5);	/// Step size control: allows maximum of 0.1% relative error in the local approximation. Need to test this out.
 	
 	// fill starting conditions from u, uprime
 	double* w = new double[8*N_+4];

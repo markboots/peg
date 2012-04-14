@@ -1,7 +1,7 @@
 INCLUDEPATH=/home/mjb865/include
 LIBPATH=/home/mjb865/lib
 CC=g++
-CFLAGS=-c -Wall -I$(INCLUDEPATH)
+CFLAGS=-c -g -Wall -I$(INCLUDEPATH)
 LDFLAGS=-L$(LIBPATH) -lgsl -lgslcblas
 SOURCES=main.cpp PEG.cpp PESolver.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
