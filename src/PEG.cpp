@@ -4,9 +4,9 @@
 #include <gsl/gsl_complex_math.h>
 #include <math.h>
 
-PEResult PEGrating::getEff(double incidenceDeg, double wl, const PEMathOptions& mo) const {
+PEResult PEGrating::getEff(double incidenceDeg, double wl, const PEMathOptions& mo, bool printDebugOutput) const {
 	PESolver s(*this, mo);
-	return s.getEff(incidenceDeg, wl);
+	return s.getEff(incidenceDeg, wl, printDebugOutput);
 }
 
 gsl_complex PEGrating::refractiveIndex(double wl) const {

@@ -88,7 +88,7 @@ public:
 	
 	
 	/// Calculates the grating efficiency at a given incidence angle \c incidenceDeg (degrees) and wavelength \c wl (um).
-	PEResult getEff(double incidenceDeg, double wl, const PEMathOptions& mo = PEMathOptions()) const;
+	PEResult getEff(double incidenceDeg, double wl, const PEMathOptions& mo = PEMathOptions(), bool printDebugOutput = false) const;
 	
 	
 protected:

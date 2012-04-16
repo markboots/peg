@@ -9,20 +9,26 @@
 #include <vector>
 #include <cmath>
 
-// h*c (Planck constant * speed of light), in eV * um.
+// h*c (Planck constant * speed of light), in eV * um.  Used in conversion from eV to um.
 #define M_HC 1.23984172
 
-/*! \todo
+/*! \todo TODO LIST
 
-- For the following input, beta2_n is coming out weird (all imaginary, instead of all real) for the outside orders.
+1. - For the following input, beta2_n is coming out weird (all imaginary, instead of all real) for the outside orders.
 
 ./pegSerial --mode constantIncidence --min 100 --max 120 --increment 5 --incidenceAngle 88 --outputFile testOutput.txt --progressFile testProgress.txt --gratingType blazed --gratingPeriod 1 --printDebugOutput --gratingMaterial Au --N 15 --gratingGeometry 2.5,30 --eV
 
 Maybe because at this incidence, there are no outside orders? Just evanescent waves?
 
+
+2.  Implement refractive index lookups and database files.
+
+
+3. Fix broken numerical results.  How?!
+
 */
 
-// Command-line option variables
+// Command-line input variables
 ////////////////////////////////
 enum Mode {InvalidMode, ConstantIncidence, ConstantIncludedAngle, ConstantWavelength};
 Mode iMode = InvalidMode;
@@ -78,7 +84,11 @@ Grating specification:
 --gratingType <rectangular|blazed|sinusoidal|trapezoidal>
 --gratingPeriod <grating period in um>
 --gratingGeometry <command-delimited list of geometry parameters, in um and/or degrees>
-	TODO
+	Rectangular profile: depth (um),valley width (um)
+	Blazed profile: blaze angle (deg),anti-blaze angle (deg)
+	Sinusoidal profile: depth (um)
+	Trapezoial profile: depth (um),valley width (um),blaze angle (deg),anti-blaze angle (deg)
+
 --gratingMaterial <grating substrate material>
 	This should be a name corresponding to a refractive index database filename, ex: Au, Ni, C, SiO2, etc.
 	

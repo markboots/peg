@@ -12,9 +12,6 @@
 /// Speed of light in um/s.
 #define M_c 2.99792458e14
 
-// Turn debug output on or off
-#define printDebugOutput 1
-
 PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo)
 	: g_(grating)
 {
@@ -60,7 +57,7 @@ PESolver::~PESolver() {
 }
 
 /// \todo Imp.
-PEResult PESolver::getEff(double incidenceDeg, double wl) {
+PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput) {
 	
 	int errCode;
 	
