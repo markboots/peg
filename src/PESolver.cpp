@@ -228,16 +228,16 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	result.incidenceDeg = incidenceDeg;
 	
 	for(int i=0; i<twoNp1_; ++i) {
-		int n = i - N_;
-		double eff = gsl_complex_abs2(gsl_vector_complex_get(B2_, i))*GSL_REAL(beta2_[i])/GSL_REAL(beta2_[N_]);
+		// int n = i - N_;
+		result.eff[i] =  gsl_complex_abs2(gsl_vector_complex_get(B2_, i))*GSL_REAL(beta2_[i])/GSL_REAL(beta2_[N_]);
 		// is this a non-propagating order?  Then the real part of beta2_n will be exactly 0, so the efficiency will come out as 0.
 		
-		if(n <= 0) {
-			result.insideEff[-n] = eff;
-		}
-		if(n >= 0) {
-			result.outsideEff[n] = eff;
-		}
+		// if(n <= 0) {
+		// 	result.insideEff[-n] = eff;
+		// }
+		// if(n >= 0) {
+		// 	result.outsideEff[n] = eff;
+		// }
 	}
 	
 	return result;

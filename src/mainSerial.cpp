@@ -575,13 +575,10 @@ void writeOutputFileResult(std::ostream& of, const PEResult& result) {
 		of << "Error:OtherFailure" << std::endl;
 		break;
 		case PEResult::Success:
-		for(int i=0, cc=result.insideEff.size(); i<cc; ++i) {
+		for(int i=0, cc=result.eff.size(); i<cc; ++i) {
 			if(i!=0)
 				of << ",";
-			of << result.insideEff.at(cc-1-i);	// insideEff is in the order <e0><e-1><e-2>...  But we actually want the opposite order <e-N><e-N+1>...<e0>.  Kinda silly that we split them up like this in PEResult, just to reassemble results in [-N, N] order.
-		}
-		for(int i=1, cc=result.outsideEff.size(); i<cc; ++i) {	// omit the 0 order, since we already have it from insideEff.
-			of << "," << result.outsideEff.at(i);
+			of << result.eff.at(i);
 		}
 		of << std::endl;
 		break;

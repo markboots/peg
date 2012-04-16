@@ -37,15 +37,17 @@ double PEGrating::height() const {
 
 
 std::ostream& operator<<(std::ostream& os, const PEResult& result) {
+	int N = (result.eff.size()-1)/2;
+	
 	switch(result.status) {
 	case PEResult::Success:
 		os << "Inside Orders" << std::endl; 
-		for(int i=0,cc=result.insideEff.size(); i<cc; ++i) {
-			os << i << "\t" << result.insideEff.at(i) << std::endl;
+		for(int i=0,cc=N; i<=cc; ++i) {
+			os << i << "\t" << result.eff.at(N-i) << std::endl;
 		}
 		os << "\nOutside Orders" << std::endl; 
-		for(int i=0,cc=result.outsideEff.size(); i<cc; ++i) {
-			os << i << "\t" << result.outsideEff.at(i) << std::endl;
+		for(int i=0,cc=N; i<=cc; ++i) {
+			os << i << "\t" << result.eff.at(N+i) << std::endl;
 		}
 		break;
 	case PEResult::InvalidGratingFailure:
