@@ -8,8 +8,10 @@
 #include <vector>
 #include <ostream>
 
-// Common definitions for the PEG parallel grating efficiency library
+// h*c (Planck constant * speed of light), in eV * um.  Used in conversion from eV to um.
+#define M_HC 1.23984172
 
+// Common definitions for the PEG parallel grating efficiency library
 
 /// This type is returned by a single grating efficiency calculation. It contains a status code/error code to indicate the result of the calculation, a vector of inside order efficiencies, and a vector of outside order efficiencies. The first element in the output vectors is the 0 order, and is duplicated over both.
 class PEResult {
@@ -58,7 +60,7 @@ public:
 	/// Specifies the grating profile, if one of the standard profiles, or CustomProfile
 	enum Profile { InvalidProfile, RectangularProfile, BlazedProfile, SinusoidalProfile, TrapezoidalProfile, CustomProfile };
 	
-	/// Default constructor; does not provide a valid grating. Use the constructors in the subclasses.
+	/// Default constructor; does not provide a valid grating. Use the constructors in the subclasses for a valid grating.
 	PEGrating() {
 		profile_ = InvalidProfile;
 		period_ = 1.0;
@@ -103,6 +105,7 @@ protected:
 	
 };
 
+/// Rectangular grating subclass
 class PERectangularGrating : public PEGrating {
 public:
 	/// Constructs a grating with a rectangular profile. The required geometry parameters are the groove \c height in um, and the \c valleyWidth in um.  The \c valleyWidth is the width of the low part of the groove, and must obviously be less than the period.
@@ -115,6 +118,7 @@ public:
 	}
 };
 
+/// Blazed grating subclass
 class PEBlazedGrating : public PEGrating {
 public:
 	/// Constructs a grating with the blazed profile. The required geometry parameters are the blaze angle \c blazeAngleDeg, in deg., and the anti-blaze angle \c antiBlazeAngleDeg.
@@ -127,6 +131,7 @@ public:
 	}
 };
 
+/// Sinusoidal grating subclass
 class PESinusoidalGrating : public PEGrating {
 public:
 	/// Constructs a grating with a perfect sinusoidal profile. The only required geometry parameter is the groove \c height, in um.
@@ -138,6 +143,7 @@ public:
 	}
 };
 
+/// Trapezoidal grating subclass
 class PETrapezoidalGrating : public PEGrating {
 public:
 	/// Constructs a grating with a trapezoidal profile. The required geometry parameters are the \c height, in um, the \c valleyWidth, in um, the blaze angle \c blazeAngleDeg, in deg., and the anti-blaze angle \c antiBlazeAngleDeg.

@@ -9,9 +9,6 @@
 #include <vector>
 #include <cmath>
 
-// h*c (Planck constant * speed of light), in eV * um.  Used in conversion from eV to um.
-#define M_HC 1.23984172
-
 /*! \todo TODO LIST
 
 1. - For the following input, beta2_n is coming out weird (all imaginary, instead of all real) for the outside orders.
@@ -266,7 +263,7 @@ int main(int argc, char** argv) {
 		}
 		
 		// run calculation
-		PEResult result = grating->getEff(incidenceAngle, wavelength, mathOptions);
+		PEResult result = grating->getEff(incidenceAngle, wavelength, mathOptions, iPrintDebugOutput);
 		if(result.status == PEResult::Success)
 			anySuccesses = true;
 		else
@@ -289,6 +286,7 @@ int main(int argc, char** argv) {
 	} // end of calculation loop.
 
 	outputFile.close();
+	delete grating;
 	return 0;
 }
 

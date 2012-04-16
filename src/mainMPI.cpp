@@ -9,24 +9,7 @@
 #include <vector>
 #include <cmath>
 
-// h*c (Planck constant * speed of light), in eV * um.  Used in conversion from eV to um.
-#define M_HC 1.23984172
-
-/*! \todo TODO LIST
-
-1. - For the following input, beta2_n is coming out weird (all imaginary, instead of all real) for the outside orders.
-
-./pegSerial --mode constantIncidence --min 100 --max 120 --increment 5 --incidenceAngle 88 --outputFile testOutput.txt --progressFile testProgress.txt --gratingType blazed --gratingPeriod 1 --printDebugOutput --gratingMaterial Au --N 15 --gratingGeometry 2.5,30 --eV
-
-Maybe because at this incidence, there are no outside orders? Just evanescent waves?
-
-
-2.  Implement refractive index lookups and database files.
-
-
-3. Fix broken numerical results.  How?!
-
-*/
+#include "mpi.h"
 
 // Command-line input variables
 ////////////////////////////////
@@ -266,7 +249,7 @@ int main(int argc, char** argv) {
 		}
 		
 		// run calculation
-		PEResult result = grating->getEff(incidenceAngle, wavelength, mathOptions);
+		PEResult result = grating->getEff(incidenceAngle, wavelength, mathOptions, iPrintDebugOutput);
 		if(result.status == PEResult::Success)
 			anySuccesses = true;
 		else
@@ -289,6 +272,7 @@ int main(int argc, char** argv) {
 	} // end of calculation loop.
 
 	outputFile.close();
+	delete grating;
 	return 0;
 }
 
