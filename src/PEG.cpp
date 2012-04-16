@@ -30,8 +30,8 @@ void PEResult::fromDoubleArray(const double* array) {
 	memcpy(&(eff[0]), array+4, eff.size()*sizeof(double));	
 }
 
-PEResult PEGrating::getEff(double incidenceDeg, double wl, const PEMathOptions& mo, bool printDebugOutput) const {
-	PESolver s(*this, mo);
+PEResult PEGrating::getEff(double incidenceDeg, double wl, const PEMathOptions& mo, bool printDebugOutput, int numThreads) const {
+	PESolver s(*this, mo, numThreads);
 	return s.getEff(incidenceDeg, wl, printDebugOutput);
 }
 

@@ -232,7 +232,7 @@ int main(int argc, char** argv) {
 		// run the calculation, but only if (i+rank) is still in range.  The last processes will have nothing to do on the last round, if the number of steps does not divided evenly by the number of processes.
 		PEResult result = PEResult(PEResult::InactiveCalculation);
 		if(i+rank < totalSteps)
-			result = grating->getEff(incidenceAngle, wavelength, mathOptions);	/// \todo What about debug output? Can only allow on Process 0?
+			result = grating->getEff(incidenceAngle, wavelength, mathOptions, (io.printDebugOutput && rank == 0), io.threads);	/// Debug output only shown on Process 0?
 		
 		// Pack up result into the send buffer
 		result.toDoubleArray(mpiSendBuffer);

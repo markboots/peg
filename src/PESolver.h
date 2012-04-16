@@ -10,7 +10,7 @@
 
 class PESolver {
 public:
-	/// Construct a solver context for the given \c grating and math options \c mo.  \c numThreads specifies how many threads to use in parallel.
+	/// Construct a solver context for the given \c grating and math options \c mo.  \c numThreads specifies how many threads to use for fine parallelization; ideally it should be <= the number of processor cores on your computer / on a single cluster node.
 	PESolver(const PEGrating& grating, const PEMathOptions& mo = PEMathOptions(), int numThreads = 1);
 	/// Destroy a solver context
 	~PESolver();

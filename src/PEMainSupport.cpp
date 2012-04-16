@@ -13,6 +13,7 @@ void PECommandLineOptions::init() {
 
 	eV = false;
 	printDebugOutput = false;
+	threads = 1;	// by default, just one thread.
 }
 
 // Sets options based on command-line input arguments. Returns isValid().
@@ -40,6 +41,7 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 				{"N", required_argument, 0, 15},
 				{"eV", no_argument, 0, 16},
 				{"printDebugOutput", no_argument, 0, 17},
+				{"threads", required_argument, 0, 18},
 				{0, 0, 0, 0}
 			};
 				
@@ -144,6 +146,9 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 			case 17: // print debug output to stdout
 				printDebugOutput = true;
 				break;
+			case 18: // number of threads to use for fine parallelization
+				threads = atol(optarg);
+				break;
 			}
 		} // end of loop over input options.
 				
@@ -184,6 +189,7 @@ bool PECommandLineOptions::isValid() {
 		if(profile == PEGrating::TrapezoidalProfile && (geometry[0] == DBL_MAX || geometry[1] == DBL_MAX || geometry[2] == DBL_MAX || geometry[3] == DBL_MAX)) throw "The trapezoidal profile requires four arguments to --gratingGeometry <depth>,<valleyWidth>,<blazeAngle>,<antiBlazeAngle>.";
 		
 		if(N == INT_MAX) throw "The truncation index --N must be provided.";
+		if(threads < 1) throw "The number of --threads to use for fine parallelization must be a positive number, at least 1.";
 	}
 	
 	catch(const char* errMsg) {

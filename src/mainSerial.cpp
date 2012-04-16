@@ -277,7 +277,7 @@ int main(int argc, char** argv) {
 		}
 		
 		// run calculation
-		PEResult result = grating->getEff(incidenceAngle, wavelength, mathOptions, io.printDebugOutput);
+		PEResult result = grating->getEff(incidenceAngle, wavelength, mathOptions, io.printDebugOutput, io.threads);
 		if(result.status == PEResult::Success)
 			anySuccesses = true;
 		else
