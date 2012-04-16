@@ -1,8 +1,8 @@
 INCLUDEPATH=/home/mjb865/include
 LIBPATH=/home/mjb865/lib
 CC=mpic++
-CFLAGS=-c -g -Wall -I$(INCLUDEPATH)
-LDFLAGS=-L$(LIBPATH) -lgsl -lgslcblas
+CFLAGS=-c -g -Wall -fopenmp -I$(INCLUDEPATH)
+LDFLAGS=-fopenmp -L$(LIBPATH) -lgsl -lgslcblas
 SOURCES=mainSerial.cpp mainMPI.cpp PEG.cpp PESolver.cpp PEMainSupport.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 
