@@ -12,7 +12,7 @@ pegSerial: mainSerial.o PEMainSupport.o PEG.o PESolver.o
 	$(CC) $(LDFLAGS) mainSerial.o PEMainSupport.o PEG.o PESolver.o -o $@
 
 pegMPI: mainMPI.o PEMainSupport.o PEG.o PESolver.o
-	$(CC) $(LDFLAGS) mainMPI.o PEG.o PESolver.o -o $@
+	$(CC) $(LDFLAGS) mainMPI.o PEMainSupport.o PEG.o PESolver.o -o $@
 
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@
