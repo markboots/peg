@@ -11,7 +11,7 @@ all: $(SOURCES) pegSerial pegMPI
 pegSerial: mainSerial.o PEG.o PESolver.o
 	$(CC) $(LDFLAGS) mainSerial.o PEG.o PESolver.o -o $@
 
-pegSerial: mainMPI.o PEG.o PESolver.o
+pegMPI: mainMPI.o PEG.o PESolver.o
 	$(CC) $(LDFLAGS) mainMPI.o PEG.o PESolver.o -o $@
 
 .cpp.o:

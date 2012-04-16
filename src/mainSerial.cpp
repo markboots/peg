@@ -12,6 +12,16 @@
 // h*c (Planck constant * speed of light), in eV * um.
 #define M_HC 1.23984172
 
+/*! \todo
+
+- For the following input, beta2_n is coming out weird (all imaginary, instead of all real) for the outside orders.
+
+./pegSerial --mode constantIncidence --min 100 --max 120 --increment 5 --incidenceAngle 88 --outputFile testOutput.txt --progressFile testProgress.txt --gratingType blazed --gratingPeriod 1 --printDebugOutput --gratingMaterial Au --N 15 --gratingGeometry 2.5,30 --eV
+
+Maybe because at this incidence, there are no outside orders? Just evanescent waves?
+
+*/
+
 // Command-line option variables
 ////////////////////////////////
 enum Mode {InvalidMode, ConstantIncidence, ConstantIncludedAngle, ConstantWavelength};
