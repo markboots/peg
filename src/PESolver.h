@@ -56,7 +56,7 @@ protected:
 	// beta array (size 2N+1)
 	gsl_complex* beta2_, * beta1_;
 	
-	// pre-allocated storage for the grating k^2 fourier coefficients.  Size must be 4N+1, since we need to compute for n from -2N to 2N.  (This only works for the single-threaded version, since this will be written for every trial solution at every y value.)
+	// pre-allocated storage for the grating k^2 fourier coefficients.  Size must be 4N+1, since we need to compute for n from -2N to 2N.  (This only works for the single-threaded version, since this will be written for every trial solution at every y value. In the multithreaded version, a local variable will be allocated for this.)
 	gsl_complex* k2_;
 	
 	// matrix u. Columns are across trial solutions (p), rows are fourier coefficients n

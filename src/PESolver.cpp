@@ -137,7 +137,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	for(int i=0; i<twoNp1_; i++) {
 		// int p = i - N_;
 		
-		// insert initial values at y=0.  u'(0) = 1* \delta_{np}.  (Already set: identity matrix)
+		// insert initial values at y=0.  u(0) = 1* \delta_{np}.  (Already set: identity matrix)
 		// u'(0) = -i * beta^(1)_n \delta_{np}
 		gsl_matrix_complex_set(uprime_, i, i, gsl_complex_mul_imag(beta1_[i], -1));
 		
@@ -331,7 +331,7 @@ PEResult::Code PESolver::computeGratingExpansion(double y, gsl_complex* k2) cons
 	double K = 2*M_PI/d;
 	
 	// loop over all values of n, from -2N to 2N.  See paper notes for formula for k^2_n [Page 5,6]
-	for(int i=0; i<(4*N_+1); ++i) {
+	for(int i=0, cc=(4*N_+1); i<cc; ++i) {
 		int n = i - 2*N_;
 		
 		if(n == 0) {
@@ -392,6 +392,7 @@ PEResult::Code PESolver::integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl
 		gsl_vector_complex_set(uprime, i, gsl_complex_rect(w[2*i + fourNp2], w[2*i + fourNp2 + 1]));
 	}
 	
+	gsl_odeiv2_driver_free(d);
 	delete [] w;	
 	return PEResult::Success;
 }
