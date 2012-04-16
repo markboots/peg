@@ -76,7 +76,7 @@ public:
 	double period() const { return period_; }
 	/// Returns profile-dependent geometry parameters
 	double geo(int parameterIndex) const { return geo_[parameterIndex]; }
-	/// Returns the height from the bottom of the grooves to the top of the grooves.  Profile-dependent.
+	/// Returns the height from the bottom of the grooves to the top of the grooves.  Profile-dependent, but the base class implementation handles the default rectangular, blazed, sinusoidal, and trapezoidal.
 	virtual double height() const;
 	
 	/// Returns the grating material code (ex: "Ni", "Au", etc.)
@@ -103,9 +103,21 @@ protected:
 	
 };
 
+class PERectangularGrating : public PEGrating {
+public:
+	/// Constructs a grating with a rectangular profile. The required geometry parameters are the groove \c height in um, and the \c valleyWidth in um.  The \c valleyWidth is the width of the low part of the groove, and must obviously be less than the period.
+	PERectangularGrating(double period = 1.0, double height = 0.05, double valleyWidth = 0.5, const std::string& material = "Au") {
+		profile_ = RectangularProfile;
+		period_ = period;
+		geo_[0] = height;
+		geo_[1] = valleyWidth;
+		material_ = material;
+	}
+};
+
 class PEBlazedGrating : public PEGrating {
 public:
-	/// Constructs a grating with the blazed profile. The required geometry parameters are \c blazeAngleDeg, the blaze angle in deg., and the anti-blaze angle \c antiBlazeAngle
+	/// Constructs a grating with the blazed profile. The required geometry parameters are the blaze angle \c blazeAngleDeg, in deg., and the anti-blaze angle \c antiBlazeAngleDeg.
 	PEBlazedGrating(double period = 1.0, double blazeAngleDeg = 2.0, double antiBlazeAngleDeg = 30, const std::string& material = "Au") {
 		profile_ = BlazedProfile;
 		period_ = period;
@@ -113,7 +125,31 @@ public:
 		geo_[1] = antiBlazeAngleDeg;
 		material_ = material;
 	}
-		
+};
+
+class PESinusoidalGrating : public PEGrating {
+public:
+	/// Constructs a grating with a perfect sinusoidal profile. The only required geometry parameter is the groove \c height, in um.
+	PESinusoidalGrating(double period = 1.0, double height = 0.05, const std::string& material = "Au") {
+		profile_ = BlazedProfile;
+		period_ = period;
+		geo_[0] = height;
+		material_ = material;
+	}
+};
+
+class PETrapezoidalGrating : public PEGrating {
+public:
+	/// Constructs a grating with a trapezoidal profile. The required geometry parameters are the \c height, in um, the \c valleyWidth, in um, the blaze angle \c blazeAngleDeg, in deg., and the anti-blaze angle \c antiBlazeAngleDeg.
+	PETrapezoidalGrating(double period = 1.0, double height = 0.05, double valleyWidth = 0.5, double blazeAngleDeg = 30.0, double antiBlazeAngleDeg = 30.0, const std::string& material = "Au") {
+		profile_ = BlazedProfile;
+		period_ = period;
+		geo_[0] = height;
+		geo_[1] = valleyWidth;
+		geo_[2] = blazeAngleDeg;
+		geo_[3] = antiBlazeAngleDeg;
+		material_ = material;
+	}
 };
 
 #endif

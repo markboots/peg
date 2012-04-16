@@ -3,13 +3,16 @@ LIBPATH=/home/mjb865/lib
 CC=g++
 CFLAGS=-c -g -Wall -I$(INCLUDEPATH)
 LDFLAGS=-L$(LIBPATH) -lgsl -lgslcblas
-SOURCES=main.cpp PEG.cpp PESolver.cpp
+SOURCES=mainSerial.cpp mainMPI.cpp PEG.cpp PESolver.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 
-all: $(SOURCES) ../build/pegSerial
+all: $(SOURCES) pegSerial pegMPI
 
-../build/pegSerial: $(OBJECTS)
-	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
+pegSerial: mainSerial.o PEG.o PESolver.o
+	$(CC) $(LDFLAGS) mainSerial.o PEG.o PESolver.o -o $@
+
+pegSerial: mainMPI.o PEG.o PESolver.o
+	$(CC) $(LDFLAGS) mainMPI.o PEG.o PESolver.o -o $@
 
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@

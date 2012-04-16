@@ -26,6 +26,10 @@ double PEGrating::height() const {
 	case SinusoidalProfile:
 		// geo(0) is the depth, aka height.
 		return geo(0);
+		
+	case TrapezoidalProfile:
+		// geo(0) is the depth, aka height.
+		return geo(0);
 	
 	default: return 0;
 	}

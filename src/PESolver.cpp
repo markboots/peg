@@ -161,15 +161,15 @@ PEResult PESolver::getEff(double incidenceDeg, double wl) {
 	
 	// Need a diagonal matrix with components 1/(i*beta2_n).
 	for(int i=0; i<twoNp1_; ++i) {
-		gsl_matrix_complex_set(iBeta2Diag_, i, i, gsl_complex_inverse(gsl_complex_mul_imag(beta2_[i], 1.0)));
+		gsl_matrix_complex_set(iBeta2Diag_, i, i, gsl_complex_mul_imag(beta2_[i], 1.0));
 	}
 	
-	// WRONG!: The T matrix is = 0.5 * (u_ - iBeta2Diag_*uprime_).  Compute and store back in T_.
-	// The actual matrix should be (i*beta2_n u - uprime)
-	// copy u_ into T_.
-	gsl_matrix_complex_memcpy(T_, u_);
-	// [This function computes C = \alpha A B + \beta C, when A is symmetric.  We will compute it for A = iBeta2Diag_, B = uprime_, \alpha = -0.5, \beta = 0.5, and C = u_ = T_.]
-	errCode = gsl_blas_zsymm(CblasLeft, CblasUpper, gsl_complex_rect(-0.5,0), iBeta2Diag_, uprime_, gsl_complex_rect(0.5,0), T_);
+	// WRONG: The T matrix is = 0.5 * (u_ - iBeta2Diag_ uprime_).  Compute and store back in T_.
+	// RIGHT: The actual matrix should be (iBeta2Diag_ u - uprime), where iBeta2Diag_ is diagonals of i*beta2_n. (Not: 1/(i*beta2_n))
+	// copy uprime_ into T_.
+	gsl_matrix_complex_memcpy(T_, uprime_);
+	// [This function computes C = \alpha A B + \beta C, when A is symmetric.  We will compute it for A = iBeta2Diag_, B = u_, \alpha = 1, \beta = -1, and C = uprime_ = T_.]
+	errCode = gsl_blas_zsymm(CblasLeft, CblasUpper, gsl_complex_rect(1,0), iBeta2Diag_, u_, gsl_complex_rect(-1.0,0), T_);
 	if(errCode) return PEResult(PEResult::AlgebraError);
 	
 	// 5. Set up the input (incidence) basis vector Vincident_
@@ -178,7 +178,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl) {
 	// fill out the incidence matrix Vincident_: when n=0, Vincident_0 = i(beta2_0 + beta1_0)*exp(-i*beta2_0*a). For all other n, Vincident_ = 0 (still).
 	z = gsl_complex_mul_imag(gsl_complex_mul(gsl_complex_add(beta2_[N_], beta1_[N_]), gsl_complex_exp(gsl_complex_mul_imag(beta2_[N_], -a))), 1.0);
 	if(printDebugOutput) {
-		std::cout << "\nIncident vector component V_0: " << GSL_REAL(z) << " " << GSL_IMAG(z) << std::endl;
+		std::cout << "\nIncident vector component Vincident_0: " << GSL_REAL(z) << " " << GSL_IMAG(z) << std::endl;
 	}
 	gsl_vector_complex_set(Vincident_, N_, z);
 	
