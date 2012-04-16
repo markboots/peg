@@ -16,7 +16,7 @@
 /// This type is returned by a single grating efficiency calculation. It contains a status code/error code to indicate the result of the calculation, a vector of inside order efficiencies, and a vector of outside order efficiencies. The first element in the output vectors is the 0 order, and is duplicated over both.
 class PEResult {
 public:
-	enum Code { Success, InvalidGratingFailure, ConvergenceFailure, InsufficientCoefficientsFailure, AlgebraError, OtherFailure };
+	enum Code { Success, InvalidGratingFailure, ConvergenceFailure, InsufficientCoefficientsFailure, AlgebraError, OtherFailure, InactiveCalculation };
 	
 	/// Constructs an empty result with the given \c statusCode
 	PEResult(Code statusCode = OtherFailure) { status = statusCode; }

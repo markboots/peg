@@ -7,6 +7,7 @@
 #include <cfloat>
 #include <climits>
 #include <vector>
+#include <algorithm>
 #include <cmath>
 
 #include "mpi.h"
@@ -56,7 +57,7 @@ void writeOutputFileProgress(std::ostream& outputFileStream, int completedSteps,
 ////////////////////////////////
 
 
-/// This main program provides a command-line interface to run a series of sequential grating efficiency calculations. The results are written to an output file, and (optionally) a second file is written to provide information on the status of the calculation.  [This file is only responsible for input processing and output; all numerical details are structured within PEGrating and PESolver.]
+/// This main program provides a command-line interface to run a set of parallel grating efficiency calculations. The }_+ is only responsible for input processing and output; all numerical details are structured within PEGrating and PESolver.]
 /*! 
 <b>Command-line options</b>
 
@@ -153,42 +154,56 @@ totalSteps=41
 */
 int main(int argc, char** argv) {
 	
+	// Initialize MPI
+	MPI_Init(&argc, &argv);
+	
+	int rank, commSize;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &commSize);
+	
 	// parse command line options into input variables.
 	if(!parseCommandLineOptions(argc, argv)) {
+		MPI_Finalize();
 		return -1;
 	}
 	
 	
-	// Open the output file:
-	std::ofstream outputFile(iOutputFile.c_str(), std::ios::out | std::ios::trunc);
-	if(!outputFile.is_open()) {
-		std::cerr << "Could not open output file " << iOutputFile;
-		return -1;
+	// On Process 0: Open the output file:
+	std::ofstream outputFile;
+	std::streampos outputFilePosition;
+	if(rank == 0) {
+		outputFile.open(iOutputFile.c_str(), std::ios::out | std::ios::trunc);
+		
+		// if(!outputFile.is_open()) {
+		// 	std::cerr << "Could not open output file " << iOutputFile;
+		// 	return -1;
+		// }
+
+		// Check that we can open the progress file, if provided:
+		// if(!iProgressFile.empty()) {
+		// 	std::ofstream progressFile(iProgressFile.c_str(), std::ios::out | std::ios::trunc);
+		// 	if(!progressFile.is_open()) {
+		// 		std::cerr << "Could not open progress file " << iProgressFile;
+		// 		return -1;
+		// 	}
+		// }
+		
+		// Write the file header:
+		writeOutputFileHeader(outputFile);
+		// Remember this position in the output file; it is where we will write the progress and output lines
+		outputFilePosition = outputFile.tellp();
 	}
-	
-	// Open the progress file, if provided:
-	std::ofstream progressFile;
-	if(!iProgressFile.empty()) {
-		progressFile.open(iProgressFile.c_str(), std::ios::out | std::ios::trunc);
-		if(!progressFile.is_open()) {
-			std::cerr << "Could not open progress file " << iProgressFile;
-			return -1;
-		}
-	}
-	
-	// Write the file header:
-	writeOutputFileHeader(outputFile);
-	// Remember this position in the output file; it is where we will write the progress and output lines
-	std::streampos outputFilePosition = outputFile.tellp();
 	
 	// How many steps do we have?
 	int totalSteps = int((iMax - iMin)/iIncrement) + 1;
 	
-	// Write the initial progress:
-	writeOutputFileProgress(outputFile, 0, totalSteps, false, false);
-	if(!iProgressFile.empty()) {
-		std::ofstream progressFile(iProgressFile.c_str(), std::ios::out | std::ios::trunc);
-		writeOutputFileProgress(progressFile, 0, totalSteps, false, false);
+	// On Process 0: Write the initial progress:
+	if(rank == 0) {
+		writeOutputFileProgress(outputFile, 0, totalSteps, false, false);
+		if(!iProgressFile.empty()) {
+			std::ofstream progressFile(iProgressFile.c_str(), std::ios::out | std::ios::trunc);
+			writeOutputFileProgress(progressFile, 0, totalSteps, false, false);
+		}
 	}
 	
 	// create the grating object.
@@ -214,15 +229,22 @@ int main(int argc, char** argv) {
 	// set math options: truncation index from input.
 	PEMathOptions mathOptions(iN);
 	
-	// output data stored here:
+	// On Process 0: output data will be stored here:
 	bool anyFailures = false;
 	bool anySuccesses = false;
 	std::vector<PEResult> results;
+	// On process 0: create a buffer for receiving results from other processes
+	int resultSize = 2*iN+1 + 4;
+	double* mpiReceiveBuffer = 0;
+	if(rank == 0)
+		mpiReceiveBuffer = new double[resultSize * commSize];
+	// On all processes, create a send buffer for packing up the results
+	double* mpiSendBuffer = new double[resultSize];
 	
-	// sequential loop over calculation steps
-	for(int i=0; i<totalSteps; ++i) {
+	// Loop over calculation steps.  Loop goes up by commSize each round, since we handle that many steps simultaneously.
+	for(int i=0; i<totalSteps; i+=commSize) {
 		
-		double currentValue = iMin + iIncrement*i;
+		double currentValue = iMin + iIncrement*(i+rank);	// creates a cyclic partition. i=0 to P0, i=1 to P1, i=2 to P2... 
 		
 		// determine wavelength (um): depends on mode and eV/um setting.
 		double wavelength = (iMode == ConstantWavelength) ? iWavelength : currentValue;
@@ -248,31 +270,56 @@ int main(int argc, char** argv) {
 			break;
 		}
 		
-		// run calculation
-		PEResult result = grating->getEff(incidenceAngle, wavelength, mathOptions, iPrintDebugOutput);
-		if(result.status == PEResult::Success)
-			anySuccesses = true;
-		else
-			anyFailures = true;
-		results.push_back(result);
+		// run the calculation, but only if (i+rank) is still in range.  The last processes will have nothing to do on the last round, if the number of steps does not divided evenly by the number of processes.
+		PEResult result = PEResult(PEResult::InactiveCalculation);
+		if(i+rank < totalSteps)
+			result = grating->getEff(incidenceAngle, wavelength, mathOptions);	/// \todo What about debug output? Can only allow on Process 0?
 		
-		// Print progress and results to output file.
-		outputFile.seekp(outputFilePosition);
-		writeOutputFileProgress(outputFile, i+1, totalSteps, anySuccesses, anyFailures);
-		outputFile << "# Output" << std::endl;
-		for(int j=0, cc=results.size(); j<cc; ++j)
-			writeOutputFileResult(outputFile, results.at(j));
+		// Pack up result into the send buffer
+		result.toDoubleArray(mpiSendBuffer);
+		
+		// MPI Gather all results for this round onto Process 0.
+		int err = MPI_Gather(mpiSendBuffer, resultSize, MPI_DOUBLE, mpiReceiveBuffer, resultSize, MPI_DOUBLE, 0, MPI_COMM_WORLD); /// \todo Err check
+
+		// On Process 0: collect results and output.
+		if(rank == 0) {
 			
-		// Update progress in progressFile, if provided.
-		if(!iProgressFile.empty()) {
-			std::ofstream progressFile(iProgressFile.c_str(), std::ios::out | std::ios::trunc);
-			writeOutputFileProgress(progressFile, i+1, totalSteps, anySuccesses, anyFailures);
+			for(int j=0; j<commSize; ++j) {
+				PEResult result;
+				result.fromDoubleArray(mpiReceiveBuffer + j*resultSize);
+				
+				if(result.status != PEResult::InactiveCalculation) {	// indicates non-calculation for inactive process on last round
+					results.push_back(result);
+					if(result.status == PEResult::Success)
+						anySuccesses = true;
+					else
+						anyFailures = true;
+				}
+			}
+		
+			// Print progress and results to output file.
+			outputFile.seekp(outputFilePosition);
+			writeOutputFileProgress(outputFile, std::min(i+commSize, totalSteps), totalSteps, anySuccesses, anyFailures);
+			outputFile << "# Output" << std::endl;
+			for(int j=0, cc=results.size(); j<cc; ++j)	// kinda lame and expensive that we need to do this on each step. Maybe switch to append-only mode, and leave the progress in just progressFile?
+				writeOutputFileResult(outputFile, results.at(j));
+			
+			// Update progress in progressFile, if provided.
+			if(!iProgressFile.empty()) {
+				std::ofstream progressFile(iProgressFile.c_str(), std::ios::out | std::ios::trunc);
+				writeOutputFileProgress(progressFile, std::min(i+commSize, totalSteps), totalSteps, anySuccesses, anyFailures);
+			}
 		}
 
 	} // end of calculation loop.
 
 	outputFile.close();
 	delete grating;
+	delete [] mpiReceiveBuffer;
+	delete [] mpiSendBuffer;
+	
+	// Finalize MPI
+	MPI_Finalize();
 	return 0;
 }
 
@@ -545,22 +592,25 @@ void writeOutputFileResult(std::ostream& of, const PEResult& result) {
 	}
 	
 	switch(result.status) {
-		case PEResult::InvalidGratingFailure:
+	case PEResult::InvalidGratingFailure:
 		of << "Error:InvalidGratingFailure" << std::endl;
 		break;
-		case PEResult::ConvergenceFailure:
+	case PEResult::ConvergenceFailure:
 		of << "Error:ConvergenceFailure" << std::endl;
 		break;
-		case PEResult::InsufficientCoefficientsFailure:
+	case PEResult::InsufficientCoefficientsFailure:
 		of << "Error:InsufficientCoefficientsFailure" << std::endl;
 		break;
-		case PEResult::AlgebraError:
+	case PEResult::AlgebraError:
 		of << "Error:AlgebraError" << std::endl;
 		break;
-		case PEResult::OtherFailure:
+	case PEResult::OtherFailure:
 		of << "Error:OtherFailure" << std::endl;
 		break;
-		case PEResult::Success:
+	case PEResult::InactiveCalculation:
+		of << "Error:InactiveCalculation" << std::endl;
+		break;
+	case PEResult::Success:
 		for(int i=0, cc=result.eff.size(); i<cc; ++i) {
 			if(i!=0)
 				of << ",";

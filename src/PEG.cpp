@@ -9,8 +9,13 @@ void PEResult::toDoubleArray(double* array) const {
 	array[0] = double(status);
 	array[1] = wavelength;
 	array[2] = incidenceDeg;
-	array[3] = double((eff.size()-1)/2);	// N
-	memcpy(array+4, &(eff.at(0)), eff.size()*sizeof(double));
+	if(eff.empty()) {
+		array[3] = 0;
+	}
+	else {
+		array[3] = double((eff.size()-1)/2);	// N
+		memcpy(array+4, &(eff.at(0)), eff.size()*sizeof(double));
+	}
 }
 
 // This unpacks the result from a plain double \c array that was filled by toDoubleArray().
@@ -85,6 +90,9 @@ std::ostream& operator<<(std::ostream& os, const PEResult& result) {
 		break;
 	case PEResult::OtherFailure:
 		os << "Error: Unknown other Failure" << std::endl;
+		break;
+	case PEResult::InactiveCalculation:
+		os << "Notice: Inactive Calculation" << std::endl;
 		break;
 	}
 	

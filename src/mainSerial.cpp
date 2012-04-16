@@ -180,10 +180,9 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 	
-	// Open the progress file, if provided:
-	std::ofstream progressFile;
+	// Check that we can open the progress file, if provided:
 	if(!iProgressFile.empty()) {
-		progressFile.open(iProgressFile.c_str(), std::ios::out | std::ios::trunc);
+		std::ofstream progressFile(iProgressFile.c_str(), std::ios::out | std::ios::trunc);
 		if(!progressFile.is_open()) {
 			std::cerr << "Could not open progress file " << iProgressFile;
 			return -1;
@@ -559,30 +558,32 @@ void writeOutputFileResult(std::ostream& of, const PEResult& result) {
 	}
 	
 	switch(result.status) {
-		case PEResult::InvalidGratingFailure:
+	case PEResult::InvalidGratingFailure:
 		of << "Error:InvalidGratingFailure" << std::endl;
 		break;
-		case PEResult::ConvergenceFailure:
+	case PEResult::ConvergenceFailure:
 		of << "Error:ConvergenceFailure" << std::endl;
 		break;
-		case PEResult::InsufficientCoefficientsFailure:
+	case PEResult::InsufficientCoefficientsFailure:
 		of << "Error:InsufficientCoefficientsFailure" << std::endl;
 		break;
-		case PEResult::AlgebraError:
+	case PEResult::AlgebraError:
 		of << "Error:AlgebraError" << std::endl;
 		break;
-		case PEResult::OtherFailure:
+	case PEResult::OtherFailure:
 		of << "Error:OtherFailure" << std::endl;
 		break;
-		case PEResult::Success:
+	case PEResult::InactiveCalculation:
+		of << "Error:InactiveCalculation" << std::endl;
+		break;
+	case PEResult::Success:
 		for(int i=0, cc=result.eff.size(); i<cc; ++i) {
-					if(i!=0)
-						of << ",";
-					of << result.eff.at(i);
-				}
+			if(i!=0)
+				of << ",";
+			of << result.eff.at(i);
+		}
 		of << std::endl;
 		break;
 	}
 }
-
 
