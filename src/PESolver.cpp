@@ -12,9 +12,11 @@
 /// Speed of light in um/s.
 #define M_c 2.99792458e14
 
-PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo)
+PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo, int numThreads)
 	: g_(grating)
 {
+	numThreads_ = numThreads;
+	
 	// set math options.
 	N_ = mo.N;
 	twoNp1_ = 2*N_ + 1;
@@ -35,11 +37,15 @@ PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo)
 	alpha_ = new double[twoNp1_];
 	beta2_ = new gsl_complex[twoNp1_];
 	beta1_ = new gsl_complex[twoNp1_];
-	k2_ = new gsl_complex[4*N_+1];
+	
+	// we need one k2_ array for each thread, since they will be used simultaneously.
+	k2_ = new gsl_complex*[numThreads_];
+	for(int i=0; i<numThreads_; ++i)
+		k2_[i] = new gsl_complex[4*N_+1];
 	
 }
 
-/// \todo Imp.
+
 PESolver::~PESolver() {
 	gsl_matrix_complex_free(u_);
 	gsl_matrix_complex_free(uprime_);
@@ -53,6 +59,8 @@ PESolver::~PESolver() {
 	delete [] alpha_;
 	delete [] beta2_;
 	delete [] beta1_;
+	for(int i=0; i<numThreads_; ++i)
+		delete [] k2_[i];
 	delete [] k2_;
 }
 
@@ -403,7 +411,8 @@ int PESolver::odeFunction(double y, const double w[], double f[]) {
 	// need to compute f = dw/dy.
 	
 	// get k2_n at this y value.
-	if(computeGratingExpansion(y, k2_) != PEResult::Success) {
+	gsl_complex* localK2 = k2ForCurrentThread();
+	if(computeGratingExpansion(y, localK2) != PEResult::Success) {
 		return GSL_EBADFUNC;	// can't calculate here. Invalid profile? y above the profile height?
 	}
 	
@@ -428,7 +437,7 @@ int PESolver::odeFunction(double y, const double w[], double f[]) {
 					
 						gsl_complex u_m = gsl_complex_rect(w[j], w[j+1]);
 						
-						gsl_complex minus_k2 = gsl_complex_mul_real(k2_[n-m + 2*N_], -1.0);	// k2_ ranges from -2N to 2N.
+						gsl_complex minus_k2 = gsl_complex_mul_real(localK2[n-m + 2*N_], -1.0);	// k2_ ranges from -2N to 2N.
 						if(n == m)
 							minus_k2 = gsl_complex_add_real(minus_k2, alpha_[n + N_]);
 						
@@ -443,4 +452,9 @@ int PESolver::odeFunction(double y, const double w[], double f[]) {
 	}
 	
 	return GSL_SUCCESS;
+}
+
+gsl_complex* PESolver::k2ForCurrentThread() {
+	/// \todo Return based on OpenMP current thread.
+	return k2_[0];
 }

@@ -10,8 +10,8 @@
 
 class PESolver {
 public:
-	/// Construct a solver context for the given \c grating and math options \c mo
-	PESolver(const PEGrating& grating, const PEMathOptions& mo = PEMathOptions());
+	/// Construct a solver context for the given \c grating and math options \c mo.  \c numThreads specifies how many threads to use in parallel.
+	PESolver(const PEGrating& grating, const PEMathOptions& mo = PEMathOptions(), int numThreads = 1);
 	/// Destroy a solver context
 	~PESolver();
 	
@@ -42,6 +42,9 @@ public:
 	
 protected:
 
+	// Number of threads to use for this calculation
+	int numThreads_;
+	
 	// The number of Fourier coefficients
 	int N_;
 	// 2*N_ + 1, since this is used a lot
@@ -56,8 +59,10 @@ protected:
 	// beta array (size 2N+1)
 	gsl_complex* beta2_, * beta1_;
 	
-	// pre-allocated storage for the grating k^2 fourier coefficients.  Size must be 4N+1, since we need to compute for n from -2N to 2N.  (This only works for the single-threaded version, since this will be written for every trial solution at every y value. In the multithreaded version, a local variable will be allocated for this.)
-	gsl_complex* k2_;
+	// pre-allocated storage for the grating k^2 fourier coefficients.  There is one array for each thread to use.  Array size must be 4N+1, since we need to compute for n from -2N to 2N.
+	gsl_complex** k2_;
+	// Helper function: returns the k^2 array that should be used by a given thread.
+	gsl_complex* k2ForCurrentThread();
 	
 	// matrix u. Columns are across trial solutions (p), rows are fourier coefficients n
 	gsl_matrix_complex* u_;
