@@ -6,7 +6,9 @@
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_cblas.h>
 #include <gsl/gsl_blas.h>
+#include <omp.h>
 
+// For debug output only:
 #include <iostream>
 
 /// Speed of light in um/s.
@@ -98,9 +100,9 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 		std::cout << "\nGrating height a (um): " << a << std::endl;
 	}
 	
-	// 2. compute all alpha_n and beta1_n, beta2_n.  (This could be a parallel loop)
+	// 2. compute all alpha_n and beta1_n, beta2_n.  (This can be a parallel loop)
 	///////////////////////////////////
-	
+#pragma omp parallel for num_threads(numThreads_)
 	for(int i=0; i<twoNp1_; i++) {
 		int n = i - N_;
 		
@@ -138,11 +140,14 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	
 	// u_ should be the identify matrix
 	gsl_matrix_complex_set_identity(u_);
-	// zero uprime_, before we set the components we need to.
+	// zero uprime_; we will set the components we need to below.
 	gsl_matrix_complex_set_zero(uprime_);
 	
 	// Loop over all trial solutions p:  [row: n.  col: p]
-	for(int i=0; i<twoNp1_; i++) {
+	// !! This is the time-consuming step, but all of the trial solutions are independent. Every loop iteration is independent, therefore we use an OpenMP parallel-for loop here. We might expect that the integration time will increase or decrease monotonically over p, so we use a cyclic partition for load-balancing. !!
+	bool integrationFailureOccurred = false;
+#pragma omp parallel for num_threads(numThreads_) schedule(static,1)
+	for(int i=0; i<twoNp1_; ++i) {
 		// int p = i - N_;
 		
 		// insert initial values at y=0.  u(0) = 1* \delta_{np}.  (Already set: identity matrix)
@@ -156,8 +161,10 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 		// need to integrate u and uprime along y, using d^2 u/dy^2 = M(y) u
 		PEResult::Code err = integrateTrialSolutionAlongY(&u.vector, &uprime.vector);
 		if(err != PEResult::Success)
-			return PEResult(err);
+			integrationFailureOccurred = true;	// We used to exit the loop here, but that is not allowed in an OpenMP parallel for.  Set this flag instead.  It is only written, but not read, by different threads, so we should be OK.
 	}
+	if(integrationFailureOccurred)
+		return PEResult(PEResult::ConvergenceFailure);
 	
 	// Now we have u(a) and u'(a) in (u, uprime) and in the columns of the actual (u_, uprime_) matrices.
 	
@@ -456,5 +463,5 @@ int PESolver::odeFunction(double y, const double w[], double f[]) {
 
 gsl_complex* PESolver::k2ForCurrentThread() {
 	/// \todo Return based on OpenMP current thread.
-	return k2_[0];
+	return k2_[omp_get_thread_num()];
 }
