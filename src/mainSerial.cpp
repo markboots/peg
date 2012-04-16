@@ -576,10 +576,10 @@ void writeOutputFileResult(std::ostream& of, const PEResult& result) {
 		break;
 		case PEResult::Success:
 		for(int i=0, cc=result.eff.size(); i<cc; ++i) {
-			if(i!=0)
-				of << ",";
-			of << result.eff.at(i);
-		}
+					if(i!=0)
+						of << ",";
+					of << result.eff.at(i);
+				}
 		of << std::endl;
 		break;
 	}

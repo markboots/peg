@@ -20,16 +20,24 @@ public:
 	
 	/// Constructs an empty result with the given \c statusCode
 	PEResult(Code statusCode = OtherFailure) { status = statusCode; }
-	/// Constructs a successful result, where insideEff and outsideEff have size \c N+1.
-	PEResult(int N) : insideEff(N+1), outsideEff(N+1) {
+	/// Constructs a successful result, where the eff array has size \c 2*N+1.
+	PEResult(int N) : eff(2*N+1) {
 		status = Success;
 	}
 	
+	/// Result of the calculation: Success, InvalidGratingFailure, ConvergenceFailure, InsufficientCoefficientsFailure, AlgebraError, or OtherFailure
 	Code status;
+	/// Wavelength for this calculation
 	double wavelength;
+	/// Incidence angle for this calculation
 	double incidenceDeg;
-	std::vector<double> insideEff;
-	std::vector<double> outsideEff;
+	/// Array of efficiencies, going from -N order up to N.  Size is 2N+1; the 0-order efficiency can be found at eff[N].
+	std::vector<double> eff;
+	
+	/// This packs the current result into a plain double \c array, for easy communication using standard MPI types.  The array must have pre-allocated room for 2N+1 + 4 elements.
+	void toDoubleArray(double* array) const;
+	/// This unpacks the result from a plain double \c array that was filled by toDoubleArray().
+	void fromDoubleArray(const double* array);
 	
 	/// Prints the output efficiencies in a table, to standard output.
 	friend std::ostream& operator<<(std::ostream& os, const PEResult& result);
