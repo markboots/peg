@@ -15,9 +15,10 @@ echo "---------------------"
 cat $PBS_NODEFILE
 echo "---------------------"
 
+DATE=`date --rfc-3339=seconds`
 NUM_PROCS=`/bin/awk 'END {print NR}' $PBS_NODEFILE`
 echo "Running on $NUM_PROCS processors."
 
 echo "prog started at: `date`"
-mpiexec -n ${NUM_PROCS} ./pegMPI --mode constantIncidence --min 100 --max 131 --increment 1 --incidenceAngle 88 --outputFile testOutput.txt --progressFile testProgress.txt --gratingType blazed --gratingPeriod 1 --gratingMaterial Au --N 15 --gratingGeometry 2.5,30 --eV
+mpiexec -n ${NUM_PROCS} ./pegMPI --mode constantIncidence --min 100 --max 131 --increment 1 --incidenceAngle 88 --outputFile "output/${DATE}.txt" --progressFile "output/progress${DATE}.txt" --gratingType blazed --gratingPeriod 1 --gratingMaterial Au --N 15 --gratingGeometry 2.5,30 --eV
 echo "prog finished at: `date`"
