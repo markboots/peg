@@ -1,0 +1,23 @@
+#!/bin/bash
+#PBS -S /bin/bash
+#PBS -r n
+#PBS -l procs=8
+#PBS -l walltime=00:10:00
+#PBS -l pmem=600m
+#PBS -m bea
+#PBS -M markjboots@gmail.com
+ 
+cd $PBS_O_WORKDIR
+echo "Current working directory is `pwd`"
+
+echo "Node file: $PBS_NODEFILE :"
+echo "---------------------"
+cat $PBS_NODEFILE
+echo "---------------------"
+
+NUM_PROCS=`/bin/awk 'END {print NR}' $PBS_NODEFILE`
+echo "Running on $NUM_PROCS processors."
+
+echo "prog started at: `date`"
+mpiexec -n ${NUM_PROCS} ./pegMPI --mode constantIncidence --min 100 --max 131 --increment 1 --incidenceAngle 88 --outputFile testOutput.txt --progressFile testProgress.txt --gratingType blazed --gratingPeriod 1 --gratingMaterial Au --N 15 --gratingGeometry 2.5,30 --eV
+echo "prog finished at: `date`"
