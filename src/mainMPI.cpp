@@ -279,7 +279,7 @@ int main(int argc, char** argv) {
 	// Timing: We know we're synchronized here because the last MPI_Gather has ensured that we have everyone's results.
 	double runTime = MPI_Wtime() - startTime;
 	if(rank == 0)
-		std::cout << "Run time (s): " << runTime;
+		std::cout << "Run time (s): " << runTime << std::endl;
 
 	outputFile.close();
 	delete grating;
