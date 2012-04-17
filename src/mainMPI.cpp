@@ -113,6 +113,10 @@ int main(int argc, char** argv) {
 	// Initialize MPI
 	MPI_Init(&argc, &argv);
 	
+	// Wait for all processes to be up and running, and then start timing
+	MPI_Barrier(MPI_COMM_WORLD);
+	double startTime = MPI_Wtime();
+	
 	int rank, commSize;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &commSize);
@@ -271,6 +275,11 @@ int main(int argc, char** argv) {
 		}
 
 	} // end of calculation loop.
+	
+	// Timing: We know we're synchronized here because the last MPI_Gather has ensured that we have everyone's results.
+	double runTime = MPI_Wtime() - startTime;
+	if(rank == 0)
+		std::cout << "Run time (s): " << runTime;
 
 	outputFile.close();
 	delete grating;
