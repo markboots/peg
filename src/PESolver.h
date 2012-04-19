@@ -11,7 +11,7 @@
 class PESolver {
 public:
 	/// Construct a solver context for the given \c grating and math options \c mo.  \c numThreads specifies how many threads to use for fine parallelization; ideally it should be <= the number of processor cores on your computer / on a single cluster node.
-	PESolver(const PEGrating& grating, const PEMathOptions& mo = PEMathOptions(), int numThreads = 1);
+	PESolver(const PEGrating& grating, const PEMathOptions& mo = PEMathOptions(), int numThreads = 1, bool measureTiming = false);
 	/// Destroy a solver context
 	~PESolver();
 	
@@ -92,6 +92,10 @@ protected:
 	// a reference to the grating we're solving
 	const PEGrating& g_;
 	
+	// A flag that indicates that we should measure the time required for all related blocks of operations
+	bool measureTiming_;
+	// Stores the timing results:
+	double timing_[12];	
 };
 
 

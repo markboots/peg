@@ -72,7 +72,9 @@ Output:
 	
 --printDebugOutput
 	If this flag is included, each calculation will print intermediate results to standard output.
-	
+
+--measureTiming
+	If this flag is included, the solver will report the time required for each category of operations to standard output.
 	
 	
 <b>Output</b>
@@ -277,7 +279,7 @@ int main(int argc, char** argv) {
 		}
 		
 		// run calculation
-		PEResult result = grating->getEff(incidenceAngle, wavelength, mathOptions, io.printDebugOutput, io.threads);
+		PEResult result = grating->getEff(incidenceAngle, wavelength, mathOptions, io.printDebugOutput, io.threads, io.measureTiming);
 		if(result.status == PEResult::Success)
 			anySuccesses = true;
 		else

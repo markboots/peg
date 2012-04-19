@@ -14,10 +14,12 @@
 /// Speed of light in um/s.
 #define M_c 2.99792458e14
 
-PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo, int numThreads)
+PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo, int numThreads, bool measureTiming)
 	: g_(grating)
 {
 	numThreads_ = numThreads;
+	measureTiming_ = measureTiming;
+	timing_[0] = omp_get_wtime();
 	
 	// set math options.
 	N_ = mo.N;
@@ -44,6 +46,8 @@ PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo, int numThr
 	k2_ = new gsl_complex*[numThreads_];
 	for(int i=0; i<numThreads_; ++i)
 		k2_[i] = new gsl_complex[4*N_+1];
+	
+	timing_[1] = omp_get_wtime();
 	
 }
 
@@ -74,6 +78,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	// 1. Setup incidence variables and constants
 	/////////////////////////////////////////
 	
+	timing_[2] = omp_get_wtime();
 	// Set this as the current wavelength
 	wl_ = wl;
 	// get refractive index at wavelength
@@ -102,6 +107,8 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	
 	// 2. compute all alpha_n and beta1_n, beta2_n.  (This can be a parallel loop)
 	///////////////////////////////////
+	timing_[3] = omp_get_wtime();
+	
 #pragma omp parallel for num_threads(numThreads_)
 	for(int i=0; i<twoNp1_; i++) {
 		int n = i - N_;
@@ -137,6 +144,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	
 	// 3. set up trial solutions at y=0, and then integrate their ODEs from y=0 to y=a.
 	////////////////////////////////////////
+	timing_[4] = omp_get_wtime();
 	
 	// u_ should be the identify matrix
 	gsl_matrix_complex_set_identity(u_);
@@ -170,6 +178,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	
 	// 4. Need to calculate the T matrix that maps the grating input to grating output (in the basis expansion)
 	/////////////////////////////
+	timing_[5] = omp_get_wtime();
 	
 	// Need a diagonal matrix with components 1/(i*beta2_n).
 	for(int i=0; i<twoNp1_; ++i) {
@@ -212,6 +221,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	
 	// 7. Solve for the reflected Rayleigh coefficients B2_.
 	////////////////////////////////
+	timing_[6] = omp_get_wtime();
 	
 	// Now we have A1_.  Need to get B2_.  From eqn. II.18, \sum_p { A^(1)_p u_{np}(a) } - A2_0 exp(-i beta2_0 a) \delta_{n,0} = B2_n exp(-i beta2_n a)
 	// The sum can be computed by the matrix-vector multiplication (u_ A1_).
@@ -238,6 +248,8 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	// 8. Now we have B2_. Compute efficiency and put into result structure.
 	////////////////////////////////////////
 	
+	timing_[7] = omp_get_wtime();
+	
 	PEResult result(N_);
 	result.wavelength = wl_;
 	result.incidenceDeg = incidenceDeg;
@@ -253,6 +265,20 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 		// if(n >= 0) {
 		// 	result.outsideEff[n] = eff;
 		// }
+	}
+	
+	timing_[8] = omp_get_wtime();
+	
+	if(measureTiming_) {
+		std::cout << "Timing Profile:" << std::endl;
+		std::cout << "   Allocate Memory: " << timing_[1] - timing_[0] << std::endl;
+		std::cout << "   Setup problem variables: " << timing_[3] - timing_[2] << std::endl;
+		std::cout << "   Compute alpha, beta2, and beta1 values: " << timing_[4] - timing_[3] << std::endl;
+		std::cout << "   Integrate all trial solutions: " << timing_[5] - timing_[4] << std::endl;
+		std::cout << "   Solve linear system for all An: " << timing_[6] - timing_[5] << std::endl;
+		std::cout << "   Compute all Bn: " << timing_[7] - timing_[6] << std::endl;
+		std::cout << "   Compute and package efficiencies: " << timing_[8] - timing_[7] << std::endl;
+		std::cout << "   Total (solver) time: " << timing_[8] - timing_[2] + timing_[1] - timing_[0] << std::endl << std::endl;
 	}
 	
 	return result;

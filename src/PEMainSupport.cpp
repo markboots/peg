@@ -14,6 +14,7 @@ void PECommandLineOptions::init() {
 	eV = false;
 	printDebugOutput = false;
 	threads = 1;	// by default, just one thread.
+	measureTiming = false;
 }
 
 // Sets options based on command-line input arguments. Returns isValid().
@@ -42,6 +43,7 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 				{"eV", no_argument, 0, 16},
 				{"printDebugOutput", no_argument, 0, 17},
 				{"threads", required_argument, 0, 18},
+				{"measureTiming", no_argument, 0, 19},
 				{0, 0, 0, 0}
 			};
 				
@@ -148,6 +150,9 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 				break;
 			case 18: // number of threads to use for fine parallelization
 				threads = atol(optarg);
+				break;
+			case 19: // measure timing
+				measureTiming = true;
 				break;
 			}
 		} // end of loop over input options.
