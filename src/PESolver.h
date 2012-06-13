@@ -37,8 +37,21 @@ public:
 		PESolver* s = static_cast<PESolver*>(peSolver);
 		return s->odeFunction(y, w, f);
 	}
-	// called to compute the values for the integration process. \todo Comment.
+	/// called to compute the values for the integration process.
 	int odeFunction(double y, const double w[], double f[]);
+
+	/// Static callback function for computing the jacobian for the ODE integration.
+	static int odeJacobianCB(double y, const double w[], double * dfdw, double dfdy[], void * params) {
+		PESolver* s = static_cast<PESolver*>(params);
+		return s->odeJacobian(y, w, dfdw, dfdy);
+	}
+
+	/// Called to compute the jacobian for the ODE integration. \c y is the independent variable, \c dfdu is the jacobian matrix in row-major order, and \c dfdy is the ODE function f'(u, y).
+	int odeJacobian(double y, const double w[], double * dfdw, double dfdy[]);
+
+
+	/// Helper function: returns the condition number of a complex matrix
+	double conditionNumber(const gsl_matrix_complex* A) const;
 	
 protected:
 

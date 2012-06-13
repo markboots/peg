@@ -86,7 +86,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	
 	// incidence angle in radians
 	double theta_2 = incidenceDeg * M_PI / 180;
-	// omega: angular frequency. Computed from wavelength in vacuum. w = 2 pi f = 2 pi c / wl 
+	// omega: angular frequency. Computed from wavelength in vacuum. w = 2 pi f = 2 pi c / wl
 	// double omega = 2 * M_PI * M_c / wl;
 	
 	// wave number in free space: k_2 = v_2 * omega / c.  v_2 = 1 in empty space, so k_2 = 2pi / wl.
@@ -102,7 +102,9 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	double a = g_.height();
 	
 	if(printDebugOutput) {
-		std::cout << "\nGrating height a (um): " << a << std::endl;
+		std::cout << "\nWavelength wl (um):" << wl_ << std::endl;
+		std::cout << "Grating height a (um): " << a << std::endl;
+		std::cout << "Grating period (um):" << d << std::endl;
 	}
 	
 	// 2. compute all alpha_n and beta1_n, beta2_n.  (This can be a parallel loop)
@@ -150,6 +152,31 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	gsl_matrix_complex_set_identity(u_);
 	// zero uprime_; we will set the components we need to below.
 	gsl_matrix_complex_set_zero(uprime_);
+
+	////////////////////////////////
+	if(printDebugOutput) {
+		std::cout << "Example grating expansion at y = 0.02" << std::endl;
+		gsl_complex* localK2 = k2ForCurrentThread();
+		computeGratingExpansion(0.01, localK2);
+
+		// wave number in free space: k_2 = v_2 * w / c.  v_2 = 1 in empty space, so k_2 = 2pi / wl.
+		gsl_complex k_2 = gsl_complex_rect(2 * M_PI / wl_, 0);
+		// wave number in the grating: k_1 = v_1 * w / c = v_1 * 2pi / wl = v_1 * k_2.
+		gsl_complex k_1 = gsl_complex_mul(v_1_, k_2);
+
+		// square them to get k^2_2 and k^2_1:
+		gsl_complex k2_2 = gsl_complex_mul(k_2, k_2);
+		gsl_complex k2_1 = gsl_complex_mul(k_1, k_1);
+
+		std::cout << "k2_2" << GSL_REAL(k2_2) << "," << GSL_IMAG(k2_2) << std::endl;
+		std::cout << "k2_1" << GSL_REAL(k2_1) << "," << GSL_IMAG(k2_1) << std::endl;
+
+		for(int i=0; i<4*N_+1; ++i) {
+			std::cout << "   " << GSL_REAL(localK2[i]) << "," << GSL_IMAG(localK2[i]);
+		}
+		std::cout << std::endl;
+	}
+	/////////////////////////////////
 	
 	// Loop over all trial solutions p:  [row: n.  col: p]
 	// !! This is the time-consuming step, but all of the trial solutions are independent. Every loop iteration is independent, therefore we use an OpenMP parallel-for loop here. We might expect that the integration time will increase or decrease monotonically over p, so we use a cyclic partition for load-balancing. !!
@@ -165,11 +192,47 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 		// create vector views: the column vectors for this trial solution
 		gsl_vector_complex_view u = gsl_matrix_complex_column(u_, i);
 		gsl_vector_complex_view uprime = gsl_matrix_complex_column(uprime_, i);
+
+		////////////////////////////
+		if(printDebugOutput && omp_get_thread_num() == 0) {
+			std::cout << "Initial value u_{p=" << i-N_ << "}(0):" <<std::endl;
+			std::cout << "     ";
+			for(int n=0; n<twoNp1_; ++n)
+				std::cout << GSL_REAL(gsl_vector_complex_get(&u.vector, n)) << "," << GSL_IMAG(gsl_vector_complex_get(&u.vector, n)) << "    ";
+			std::cout << std::endl;
+			std::cout << "Initial value u'_{p=" << i-N_ << "}(0):" <<std::endl;
+			std::cout << "     ";
+			for(int n=0; n<twoNp1_; ++n)
+				std::cout << GSL_REAL(gsl_vector_complex_get(&uprime.vector, n)) << "," << GSL_IMAG(gsl_vector_complex_get(&uprime.vector, n)) << "    ";
+			std::cout << std::endl;
+			std::cout << std::endl;
+		}
+		//////////////////////////
 		
 		// need to integrate u and uprime along y, using d^2 u/dy^2 = M(y) u
 		PEResult::Code err = integrateTrialSolutionAlongY(&u.vector, &uprime.vector);
 		if(err != PEResult::Success)
 			integrationFailureOccurred = true;	// We used to exit the loop here, but that is not allowed in an OpenMP parallel for.  Set this flag instead.  It is only written, but not read, by different threads, so we should be OK.
+
+		//////////////////////////
+		if(printDebugOutput && omp_get_thread_num() == 0) {
+			if(err == PEResult::Success) {
+				std::cout << "Final value u_{p=" << i-N_ << "}(" << g_.height() << "):" <<std::endl;
+				std::cout << "     ";
+				for(int n=0; n<twoNp1_; ++n)
+					std::cout << GSL_REAL(gsl_vector_complex_get(&u.vector, n)) << "," << GSL_IMAG(gsl_vector_complex_get(&u.vector, n)) << "    ";
+				std::cout << std::endl;
+				std::cout << "Final value u'_{p=" << i-N_ << "}(" << g_.height() << "):" <<std::endl;
+				std::cout << "     ";
+				for(int n=0; n<twoNp1_; ++n)
+					std::cout << GSL_REAL(gsl_vector_complex_get(&uprime.vector, n)) << "," << GSL_IMAG(gsl_vector_complex_get(&u.vector, n)) << "    ";
+				std::cout << std::endl;
+				std::cout << std::endl;
+			}
+			else
+				std::cout << "Integration Failure on p=" << i-N_ << std::endl;
+		}
+		/////////////////////////////
 	}
 	if(integrationFailureOccurred)
 		return PEResult(PEResult::ConvergenceFailure);
@@ -192,6 +255,23 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	// [This function computes C = \alpha A B + \beta C, when A is symmetric.  We will compute it for A = iBeta2Diag_, B = u_, \alpha = 1, \beta = -1, and C = uprime_ = T_.]
 	errCode = gsl_blas_zsymm(CblasLeft, CblasUpper, gsl_complex_rect(1,0), iBeta2Diag_, u_, gsl_complex_rect(-1.0,0), T_);
 	if(errCode) return PEResult(PEResult::AlgebraError);
+
+	//////////////////////////////////////
+	if(printDebugOutput) {
+
+		std::cout << "T matrix:" << std::endl;
+
+		for(int i=0; i<twoNp1_; ++i) {
+			for(int j=0; j<twoNp1_; ++j) {
+				gsl_complex z = gsl_matrix_complex_get(T_, i, j);
+				std::cout << GSL_REAL(z) << "+" << GSL_IMAG(z) << "i, ";
+			}
+			std::cout << ";" << std::endl;
+		}
+
+		std::cout << std::endl << std::endl;
+	}
+	//////////////////////////////////////
 	
 	// 5. Set up the input (incidence) basis vector Vincident_
 	/////////////////////////////
@@ -199,7 +279,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	// fill out the incidence matrix Vincident_: when n=0, Vincident_0 = i(beta2_0 + beta1_0)*exp(-i*beta2_0*a). For all other n, Vincident_ = 0 (still).
 	z = gsl_complex_mul_imag(gsl_complex_mul(gsl_complex_add(beta2_[N_], beta1_[N_]), gsl_complex_exp(gsl_complex_mul_imag(beta2_[N_], -a))), 1.0);
 	if(printDebugOutput) {
-		std::cout << "\nIncident vector component Vincident_0: " << GSL_REAL(z) << " " << GSL_IMAG(z) << std::endl;
+		std::cout << "\nIncident vector component Vincident_0: " << GSL_REAL(z) << "," << GSL_IMAG(z) << std::endl;
 	}
 	gsl_vector_complex_set(Vincident_, N_, z);
 	
@@ -254,17 +334,13 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	result.wavelength = wl_;
 	result.incidenceDeg = incidenceDeg;
 	
+	double effSum = 0;
 	for(int i=0; i<twoNp1_; ++i) {
 		// int n = i - N_;
 		result.eff[i] =  gsl_complex_abs2(gsl_vector_complex_get(B2_, i))*GSL_REAL(beta2_[i])/GSL_REAL(beta2_[N_]);
 		// is this a non-propagating order?  Then the real part of beta2_n will be exactly 0, so the efficiency will come out as 0.
 		
-		// if(n <= 0) {
-		// 	result.insideEff[-n] = eff;
-		// }
-		// if(n >= 0) {
-		// 	result.outsideEff[n] = eff;
-		// }
+		effSum += result.eff[i];
 	}
 	
 	timing_[8] = omp_get_wtime();
@@ -279,6 +355,10 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 		std::cout << "   Compute all Bn: " << timing_[7] - timing_[6] << std::endl;
 		std::cout << "   Compute and package efficiencies: " << timing_[8] - timing_[7] << std::endl;
 		std::cout << "   Total (solver) time: " << timing_[8] - timing_[2] + timing_[1] - timing_[0] << std::endl << std::endl;
+	}
+
+	if(printDebugOutput) {
+		std::cout << "Sum of efficiencies (should be 1): " << effSum << std::endl;
 	}
 	
 	return result;
@@ -304,13 +384,17 @@ PEResult::Code PESolver::computeGratingExpansion(double y, gsl_complex* k2) cons
 
 	// Determine x1 and x2, based on the geometry of the profile.
 	switch(g_.profile()) {
-				
+
 	case PEGrating::RectangularProfile:
 		// For rectangular profiles, geo(0) is the depth, geo(1) is the valley width.
-		if(y > g_.geo(0))
+		if(y > g_.geo(0) + 1e-10) {
+			std::cout << "Grating Expansion: Error: Height " << y-0.04 << " is above the grating maximum " << g_.geo(0)-0.04 << std::endl;
 			return PEResult::InvalidGratingFailure;	// above the grating.
-		if(g_.geo(1) > d)
+		}
+		if(g_.geo(1) > d) {
+			std::cout << "Grating Expansion: Error: Valleys " << g_.geo(1) << " are wider than period " << d << std::endl;
 			return PEResult::InvalidGratingFailure;	// valleys are wider than the period... Not possible.
+		}
 		
 		// simple, because the groove walls don't depend on y:
 		x1 = g_.geo(1);
@@ -328,8 +412,10 @@ PEResult::Code PESolver::computeGratingExpansion(double y, gsl_complex* k2) cons
 		x1 = y / tan(blaze);
 		x2 = d - y / tan(antiBlaze);
 		
-		if(x2 < x1)
+		if(x2 < x1) {
+			std::cout << "Grating Expansion: Error: Above the grating: x2 is less than x1 by " << x1-x2 << std::endl;
 			return PEResult::InvalidGratingFailure;	// above the grating.
+		}
 		break;
 	}
 		
@@ -345,12 +431,12 @@ PEResult::Code PESolver::computeGratingExpansion(double y, gsl_complex* k2) cons
 		x2 = d - x1;	// due to symmetry.
 		break;
 	}
-	
+
 	case PEGrating::TrapezoidalProfile:
 	case PEGrating::InvalidProfile:
 	case PEGrating::CustomProfile:
 	default:
-		return PEResult::InvalidGratingFailure;		
+		return PEResult::InvalidGratingFailure;
 	}
 	
 	// wave number in free space: k_2 = v_2 * w / c.  v_2 = 1 in empty space, so k_2 = 2pi / wl.
@@ -398,14 +484,15 @@ PEResult::Code PESolver::computeGratingExpansion(double y, gsl_complex* k2) cons
 
 PEResult::Code PESolver::integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl_vector_complex* uprime) {
 	// define ode solving system, with our function to evaluate dw/dy, no Jacobian, and 8*N_+4 components.
-	gsl_odeiv2_system odeSys = {odeFunctionCB, 0, 8*N_+4, this};
+	gsl_odeiv2_system odeSys = {odeFunctionCB, odeJacobianCB, 8*N_+4, this};
 	
 	// initial starting step in y: choose grating height / 200.
 	double gratingHeight = g_.height();
 	double hStart = gratingHeight / 200.0;
 	
 	// setup driver
-	gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_standard_new (&odeSys, gsl_odeiv2_step_rkf45, hStart, 0, 0.00001, 0.5, 0.5);	/// Step size control: allows maximum of 0.1% relative error in the local approximation. Need to test this out.
+	gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_standard_new (&odeSys, gsl_odeiv2_step_msadams, hStart, 1e-8, 1e-8, 0.5, 0.5);	/// Step size control: allows maximum of 0.1% relative error in the local approximation. Need to test this out.
+
 	
 	// fill starting conditions from u, uprime
 	double* w = new double[8*N_+4];
@@ -424,6 +511,7 @@ PEResult::Code PESolver::integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl
 	double y = 0;
 	int status = gsl_odeiv2_driver_apply (d, &y, gratingHeight, w);
 	if (status != GSL_SUCCESS) {
+		std::cout << "ODE: Integration failure: Code: " << status << std::endl;
 		return PEResult::ConvergenceFailure;
 	}
 	
@@ -434,60 +522,154 @@ PEResult::Code PESolver::integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl
 	}
 	
 	gsl_odeiv2_driver_free(d);
-	delete [] w;	
+	delete [] w;
 	return PEResult::Success;
 }
 
-int PESolver::odeFunction(double y, const double w[], double f[]) {
+int PESolver::odeFunction(double y, const double w[], double dwdy[]) {
 	
 	// w contains the last values of u_n{re, im} and u'_n{re, im}, in that order.
-	// need to compute f = dw/dy.
+	// need to compute f = dw/dy = u'_n{re, im} followed by u''_n{re, im}
 	
 	// get k2_n at this y value.
 	gsl_complex* localK2 = k2ForCurrentThread();
 	if(computeGratingExpansion(y, localK2) != PEResult::Success) {
+		std::cout << "ODE: Function Error: Cannot compute grating expansion at y = " << y << std::endl;
 		return GSL_EBADFUNC;	// can't calculate here. Invalid profile? y above the profile height?
 	}
 	
+	int fourNp2 = 4*N_+2;	// fourNp2 divides the top and bottom of the arrays w, f.  Top of w is u; bottom of w is u' = v.   Top of f is u' = v;  bottom of f is v' = u''.
+	int eightNp4 = 8*N_+4;
 	// size is (2N+1)x2x2, ie: 8N+4.
-	for(int i=0, eightNp4=8*N_+4; i<eightNp4; ++i) {
-		int fourNp2 = 4*N_+2;	// fourNp2 divides the top and bottom of the arrays w, f.  Top of w is u; bottom of w is u' = v.   Top of f is u' = v;  bottom of f is v' = u''.
-		
-		if(i < fourNp2) {
-			// working on computing u'_n = v. [top of f array]. Just copy from v = u' = [bottom half of w array]
-			f[i] = w[i + fourNp2];
-		}
-		
-		else {
-			// working on computing v'_n = u''_n [bottom of f array].  We'll handle real and imaginary components at once, so only do this if i is even.
-			if(i%2 == 0) {
-				int n = (i - fourNp2)/2 - N_;
-				gsl_complex upp_n = gsl_complex_rect(0,0);	// initialize sum to 0.
-				// loop over m.  Retrieving u_n values from top of array.
-				for(int j=0; j<fourNp2; ++j) {
-					if(j%2 == 0) {	// also handling real and imaginary components at once.
-						int m = j/2 - N_;
-					
-						gsl_complex u_m = gsl_complex_rect(w[j], w[j+1]);
-						
-						gsl_complex minus_k2 = gsl_complex_mul_real(localK2[n-m + 2*N_], -1.0);	// k2_ ranges from -2N to 2N.
-						if(n == m)
-							minus_k2 = gsl_complex_add_real(minus_k2, alpha_[n + N_]);
-						
-						upp_n = gsl_complex_add(upp_n, gsl_complex_mul(minus_k2, u_m));
-					}
-				}
-				
-				f[i] = GSL_REAL(upp_n);
-				f[i+1] = GSL_IMAG(upp_n);
-			}
-		}
+	for(int i=0; i<fourNp2; ++i) {
+		// working on computing u'_n = v. [top of f array]. Just copy from v = u' = [bottom half of w array]
+		dwdy[i] = w[i + fourNp2];
 	}
+
+	for(int i=fourNp2; i<eightNp4; i+=2) {
+		// working on computing v'_n = u''_n [bottom of f array].  We'll handle real and imaginary components at once.
+		int n = (i - fourNp2)/2 - N_;
+		gsl_complex upp_n = gsl_complex_rect(0,0);	// initialize sum to 0.
+		// loop over m.  Retrieving u_n values from top of array.
+		for(int j=0; j<fourNp2; j+=2) { // also handling real and imaginary components at once.
+			int m = j/2 - N_;
+
+			gsl_complex u_m = gsl_complex_rect(w[j], w[j+1]);
+
+			gsl_complex minus_k2 = gsl_complex_mul_real(localK2[n-m + 2*N_], -1.0);	// k2_ ranges from -2N to 2N.
+			if(n == m)
+				minus_k2 = gsl_complex_add_real(minus_k2, alpha_[n + N_]);
+
+			upp_n = gsl_complex_add(upp_n, gsl_complex_mul(minus_k2, u_m));
+		}
+
+		dwdy[i] = GSL_REAL(upp_n);
+		dwdy[i+1] = GSL_IMAG(upp_n);
+	}
+
+	// Debugging output:
+	//////////////////////
+	//	double sum;
+	//	for(int i=0; i<4*N_+2; i+=2) {
+	//		gsl_complex u_n = gsl_complex_rect(w[i], w[i+1]);
+	//		sum += GSL_REAL(gsl_complex_mul(u_n, gsl_complex_conjugate(u_n)));
+	//	}
+	//	std::cout << "y: " << y << " Power: " << sum << std::endl;
 	
 	return GSL_SUCCESS;
 }
 
+
+int PESolver::odeJacobian(double y, const double w[], double *dfdw, double dfdy[])
+{
+	// y is the indep. variable.
+	// u[] contains the current solution u(y): contains u1=u followed by u2=u'.
+	// dfdw is the Jacobian; in row-major order.
+	// dfdy is the partial time deriv; no idea how to calc.
+
+	// get k2_n at this y value.
+	gsl_complex* localK2 = k2ForCurrentThread();
+	if(computeGratingExpansion(y, localK2) != PEResult::Success) {
+		std::cout << "ODE: Jacobian Error: Cannot compute grating expansion at y = " << y << std::endl;
+		return GSL_EBADFUNC;	// can't calculate here. Invalid profile? y above the profile height?
+	}
+
+	int fourNp2 = 4*N_+2;	// fourNp2 divides the top and bottom of the arrays w, f.  Top of w is u; bottom of w is u' = v.   Top of f is u' = v;  bottom of f is v' = u''.
+	int eightNp4 = 8*N_+4;	// size is (2N+1)x2x2, ie: 8N+4.
+
+	// clear the jacobian
+	memset(dfdw, 0, eightNp4*eightNp4*sizeof(double));
+	memset(dfdy, 0, eightNp4*sizeof(double));
+
+	// go through top rows of jac [i=0,fourNp2]. Set ident. matrix in upper right-hand block.
+	for(int i=0; i<fourNp2; ++i) {
+		dfdw[i*eightNp4+fourNp2+i] = 1.0;		// set at index dfdw(i, fourNp2+i).
+	}
+
+	// go throgh lower rows of jac [i=fourNp2, eightNp4]. In lower left-hand block, set 4x4 submatrices at once, so go by i+=2.
+	for(int i=fourNp2; i<eightNp4; i+=2) {
+		int n = (i - fourNp2)/2 - N_;	// n index [row] from -N to N.
+
+		// loop over m [col].
+		for(int j=0; j<fourNp2; j+=2) { // also handling real and imaginary components at once.
+			int m = j/2 - N_;	// m index [col] from -N to N.
+
+			// get M_{nm}: -(k^2)_{n-m}(y) + alpha^2_n \delta_{nm}
+			gsl_complex M_nm = gsl_complex_mul_real(localK2[n-m + 2*N_], -1.0);	// k2_ ranges from -2N to 2N.
+			if(n == m)
+				M_nm = gsl_complex_add_real(M_nm, alpha_[n + N_]);
+
+			// set 4x4 matrix here: [M_re, -M_im; M_im, M_re] at (i,j), (i, j+1); (i+1, j), (i+1, j+1)
+			dfdw[i*eightNp4 + j] = GSL_REAL(M_nm);
+			dfdw[i*eightNp4 + j + 1] = -GSL_IMAG(M_nm);
+			dfdw[(i+1)*eightNp4 + j] = GSL_IMAG(M_nm);
+			dfdw[(i+1)*eightNp4 + j + 1] = GSL_REAL(M_nm);
+		}
+	}
+
+	/// \todo IMPORTANT! Leaving dfdy = 0 for now. This is only true in case of rectangular grating...
+
+	return GSL_SUCCESS;
+}
+
 gsl_complex* PESolver::k2ForCurrentThread() {
-	/// \todo Return based on OpenMP current thread.
+	/// Return based on OpenMP current thread.
 	return k2_[omp_get_thread_num()];
 }
+
+double PESolver::conditionNumber(const gsl_matrix_complex *A) const
+{
+	// according to http://en.wikipedia.org/wiki/Condition_number,
+	// When using the 2-norm, cond(A) = max(Singular Values) / min(Singular Values)
+
+	// compute Singular Value Decomposition
+
+	// Make copy of A:
+	gsl_matrix_complex* A2 = gsl_matrix_complex_alloc(A->size1, A->size2);
+	gsl_matrix_complex_memcpy(A2, A);
+
+	// Create other matrices:
+	gsl_matrix_complex* Ainv = gsl_matrix_complex_alloc(A->size1, A->size2);
+	gsl_permutation* permut = gsl_permutation_alloc(A->size1);
+
+	int signum;
+	if(gsl_linalg_complex_LU_decomp(A2, permut, &signum) != GSL_SUCCESS) {
+		std::cout << "Warning: LU failed!" << std::endl;
+		return 0;
+	}
+
+	if(gsl_linalg_complex_LU_invert(A2, permut, Ainv) != GSL_SUCCESS) {
+		std::cout << "Warning: Invert failed!" << std::endl;
+		return 0;
+	}
+
+	// how to get the norm of a complex matrix?
+
+	gsl_matrix_complex_free(A2);
+	gsl_matrix_complex_free(Ainv);
+	gsl_permutation_free(permut);
+
+	return 1;
+}
+
+
