@@ -45,7 +45,7 @@ PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo, int numThr
 	// we need one k2_ array for each thread, since they will be used simultaneously.
 	k2_ = new gsl_complex*[numThreads_];
 	for(int i=0; i<numThreads_; ++i)
-		k2_[i] = new gsl_complex[4*N_+1];
+		k2_[i] = new gsl_complex[twoNp1_];
 	
 	timing_[1] = omp_get_wtime();
 	
@@ -171,7 +171,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 		std::cout << "k2_2" << GSL_REAL(k2_2) << "," << GSL_IMAG(k2_2) << std::endl;
 		std::cout << "k2_1" << GSL_REAL(k2_1) << "," << GSL_IMAG(k2_1) << std::endl;
 
-		for(int i=0; i<4*N_+1; ++i) {
+		for(int i=0; i<twoNp1_; ++i) {
 			std::cout << "   " << GSL_REAL(localK2[i]) << "," << GSL_IMAG(localK2[i]);
 		}
 		std::cout << std::endl;
@@ -365,7 +365,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 }
 
 gsl_complex PESolver::complex_sqrt_upperComplexPlane(gsl_complex z) {
-	
+
 	gsl_complex w = gsl_complex_sqrt(z); // returns w in the right half of complex plane.
 	
 	if(GSL_IMAG(w) < 0) {
@@ -457,9 +457,9 @@ PEResult::Code PESolver::computeGratingExpansion(double y, gsl_complex* k2) cons
 	// for shorter calculations, define K as the grating number, 2*pi/d.  We just calculate it once.
 	double K = 2*M_PI/d;
 	
-	// loop over all values of n, from -2N to 2N.  See paper notes for formula for k^2_n [Page 5,6]
-	for(int i=0, cc=(4*N_+1); i<cc; ++i) {
-		int n = i - 2*N_;
+	// loop over all values of n, from -N to N.  See paper notes for formula for k^2_n [Page 5,6]
+	for(int i=0; i<twoNp1_; ++i) {
+		int n = i - N_;
 		
 		if(n == 0) {
 			gsl_complex kk = gsl_complex_mul_real(k2_2, d);
@@ -491,7 +491,7 @@ PEResult::Code PESolver::integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl
 	double hStart = gratingHeight / 200.0;
 	
 	// setup driver
-	gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_standard_new (&odeSys, gsl_odeiv2_step_msadams, hStart, 1e-8, 1e-8, 0.5, 0.5);	/// Step size control: allows maximum of 0.1% relative error in the local approximation. Need to test this out.
+	gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_standard_new (&odeSys, gsl_odeiv2_step_msadams, hStart, 1e-8, 1e-8, 0.5, 0.5);
 
 	
 	// fill starting conditions from u, uprime
@@ -556,11 +556,13 @@ int PESolver::odeFunction(double y, const double w[], double dwdy[]) {
 
 			gsl_complex u_m = gsl_complex_rect(w[j], w[j+1]);
 
-			gsl_complex minus_k2 = gsl_complex_mul_real(localK2[n-m + 2*N_], -1.0);	// k2_ ranges from -2N to 2N.
+			gsl_complex M_nm = gsl_complex_rect(0,0);
+			if(n-m >= -N_ && n-m <= N_)
+				M_nm = gsl_complex_mul_real(localK2[n-m + N_], -1.0);	// -k^2_{n-m}
 			if(n == m)
-				minus_k2 = gsl_complex_add_real(minus_k2, alpha_[n + N_]);
+				M_nm = gsl_complex_add_real(M_nm, alpha_[n + N_]);
 
-			upp_n = gsl_complex_add(upp_n, gsl_complex_mul(minus_k2, u_m));
+			upp_n = gsl_complex_add(upp_n, gsl_complex_mul(M_nm, u_m));
 		}
 
 		dwdy[i] = GSL_REAL(upp_n);
@@ -615,7 +617,9 @@ int PESolver::odeJacobian(double y, const double w[], double *dfdw, double dfdy[
 			int m = j/2 - N_;	// m index [col] from -N to N.
 
 			// get M_{nm}: -(k^2)_{n-m}(y) + alpha^2_n \delta_{nm}
-			gsl_complex M_nm = gsl_complex_mul_real(localK2[n-m + 2*N_], -1.0);	// k2_ ranges from -2N to 2N.
+			gsl_complex M_nm = gsl_complex_rect(0,0);
+			if(n-m >= -N_ && n-m <= N_)
+				M_nm = gsl_complex_mul_real(localK2[n-m + N_], -1.0);	// k2_ ranges from -N to N.
 			if(n == m)
 				M_nm = gsl_complex_add_real(M_nm, alpha_[n + N_]);
 
