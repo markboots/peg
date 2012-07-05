@@ -303,7 +303,7 @@ void writeOutputFileResult(std::ostream& of, const PEResult& result, const PECom
 		of << result.incidenceDeg << "\t";
 	}
 	else {
-		of << (io.eV ? M_HC / result.wavelength : result.wavelength*1e6) << "\t";	// output in eV or um, but result.wavelength is in m.
+		of << (io.eV ? M_HC / result.wavelength : result.wavelength) << "\t";
 	}
 	
 	switch(result.status) {

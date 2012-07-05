@@ -221,20 +221,20 @@ int main(int argc, char** argv) {
 		writeOutputFileProgress(progressFile, 0, totalSteps, false, false);
 	}
 	
-	// create the grating object. Convert from um to m for calculations.
+	// create the grating object.
 	PEGrating* grating;
 	switch(io.profile) {
 	case PEGrating::RectangularProfile:
-		grating = new PERectangularGrating(io.period*1e-6, io.geometry[0]*1e-6, io.geometry[1]*1e-6, io.material);
+		grating = new PERectangularGrating(io.period, io.geometry[0], io.geometry[1], io.material);
 		break;
 	case PEGrating::BlazedProfile:
-		grating = new PEBlazedGrating(io.period*1e-6, io.geometry[0], io.geometry[1], io.material);
+		grating = new PEBlazedGrating(io.period, io.geometry[0], io.geometry[1], io.material);
 		break;
 	case PEGrating::SinusoidalProfile:
-		grating = new PESinusoidalGrating(io.period*1e-6, io.geometry[0]*1e-6, io.material);
+		grating = new PESinusoidalGrating(io.period, io.geometry[0], io.material);
 		break;
 	case PEGrating::TrapezoidalProfile:
-		grating = new PETrapezoidalGrating(io.period*1e-6, io.geometry[0]*1e-6, io.geometry[1]*1e-6, io.geometry[2], io.geometry[3], io.material);
+		grating = new PETrapezoidalGrating(io.period, io.geometry[0], io.geometry[1], io.geometry[2], io.geometry[3], io.material);
 		break;
 	default:
 		grating = 0;	// this will never happen; input validation assures one of the valid grating types.
@@ -257,9 +257,7 @@ int main(int argc, char** argv) {
 		// determine wavelength (um): depends on mode and eV/um setting.
 		double wavelength = (io.mode == PECommandLineOptions::ConstantWavelength) ? io.wavelength : currentValue;
 		if(io.eV)
-			wavelength = M_HC / wavelength;	// interpret input wavelength as eV instead, and convert to actual wavelength.  Formula: wavelength = hc / eV.     hc = 1.23984172e-6 eV * m.
-		else
-			wavelength = wavelength*1e-6;	// convert from um to m.
+			wavelength = M_HC / wavelength;	// interpret input wavelength as eV instead, and convert to actual wavelength.  Formula: wavelength = hc / eV.     hc = 1.23984172 eV * um.
 		
 		// determine incidence angle: depends on mode and possibly wavelength.
 		double incidenceAngle;
@@ -269,7 +267,7 @@ int main(int argc, char** argv) {
 			break;
 		case PECommandLineOptions::ConstantIncludedAngle: {
 			double ciaRad = io.includedAngle * M_PI / 180;
-			incidenceAngle = (asin(-io.toOrder*wavelength/2/grating->period()/cos(ciaRad/2)) + ciaRad/2) * 180 / M_PI;	// formula for constant included angle: satisfies alpha + beta = cia, and grating equation io.toOrder*wavelength/d = sin(beta) - sin(alpha).
+			incidenceAngle = (asin(-io.toOrder*wavelength/2/io.period/cos(ciaRad/2)) + ciaRad/2) * 180 / M_PI;	// formula for constant included angle: satisfies alpha + beta = cia, and grating equation io.toOrder*wavelength/d = sin(beta) - sin(alpha).
 			break;
 			}
 		case PECommandLineOptions::ConstantWavelength:

@@ -8,8 +8,8 @@
 #include <vector>
 #include <ostream>
 
-// h*c (Planck constant * speed of light), in eV * m.  Used in conversion from eV to m.
-#define M_HC 1.23984172e-6
+// h*c (Planck constant * speed of light), in eV * um.  Used in conversion from eV to um.
+#define M_HC 1.23984172
 
 // Common definitions for the PEG parallel grating efficiency library
 
@@ -27,7 +27,7 @@ public:
 	
 	/// Result of the calculation: Success, InvalidGratingFailure, ConvergenceFailure, InsufficientCoefficientsFailure, AlgebraError, or OtherFailure
 	Code status;
-	/// Wavelength for this calculation (m)
+	/// Wavelength for this calculation
 	double wavelength;
 	/// Incidence angle for this calculation
 	double incidenceDeg;
@@ -50,13 +50,13 @@ class PEMathOptions {
 public:
 	/// Fourier truncation index N. Should be a positive number.
 	int N;
-//	/// Number of integration steps along y
-//	int niy;
+	/// Number of integration steps along y
+	int niy;
 	
 	/// Constructor:
-	PEMathOptions(int FourierN = 15) {
+	PEMathOptions(int FourierN = 15, int numberOfIntegrationSteps = 401) {
 		N = FourierN;
-//		niy = numberOfIntegrationSteps;
+		niy = numberOfIntegrationSteps;
 	}
 };
 
@@ -71,7 +71,7 @@ public:
 	/// Default constructor; does not provide a valid grating. Use the constructors in the subclasses for a valid grating.
 	PEGrating() {
 		profile_ = InvalidProfile;
-		period_ = 1.0e-6;
+		period_ = 1.0;
 		material_ = "Au";
 	}
 	
@@ -82,7 +82,7 @@ public:
 	
 	/// Returns the profile of this grating: CustomProfile, RectangularProfile, BlazedProfile, SinusoidalProfile, TrapezoidalProfile
 	Profile profile() const { return profile_; }
-	/// Returns the grating periodicity, in m
+	/// Returns the grating periodicity, in um
 	double period() const { return period_; }
 	/// Returns profile-dependent geometry parameters
 	double geo(int parameterIndex) const { return geo_[parameterIndex]; }
@@ -93,18 +93,18 @@ public:
 	std::string material() const { return material_; }
 	
 	
-	/// Returns the complex refractive index at a given wavelength \c wl in m. \todo Imp. Current is Pt at 410 eV.
+	/// Returns the complex refractive index at a given wavelength \c wl in um. \todo Imp. Current is Pt at 410 eV.
 	gsl_complex refractiveIndex(double wl) const;
 	
 	
-	/// Calculates the grating efficiency at a given incidence angle \c incidenceDeg (degrees) and wavelength \c wl (m). \c numThreads is the number of threads to use for fine parallelization; ideally it should be <= the number of processor cores on your computer / on a single cluster node.
+	/// Calculates the grating efficiency at a given incidence angle \c incidenceDeg (degrees) and wavelength \c wl (um). \c numThreads is the number of threads to use for fine parallelization; ideally it should be <= the number of processor cores on your computer / on a single cluster node.
 	PEResult getEff(double incidenceDeg, double wl, const PEMathOptions& mo = PEMathOptions(), bool printDebugOutput = false, int numThreads = 1, bool measureTiming = false) const;
 	
 	
 protected:
 	/// Grating profile type
 	Profile profile_;
-	/// Grating periodicity, in m
+	/// Grating periodicity, in um
 	double period_;
 	/// General geometry parameters. Interpretation depends on profile.
 	double geo_[8];
@@ -116,8 +116,8 @@ protected:
 /// Rectangular grating subclass
 class PERectangularGrating : public PEGrating {
 public:
-	/// Constructs a grating with a rectangular profile. The required geometry parameters are the groove \c height in m, and the \c valleyWidth in m.  The \c valleyWidth is the width of the low part of the groove, and must obviously be less than the period.
-	PERectangularGrating(double period = 1.0e-6, double height = 0.05e-6, double valleyWidth = 0.5e-6, const std::string& material = "Au") {
+	/// Constructs a grating with a rectangular profile. The required geometry parameters are the groove \c height in um, and the \c valleyWidth in um.  The \c valleyWidth is the width of the low part of the groove, and must obviously be less than the period.
+	PERectangularGrating(double period = 1.0, double height = 0.05, double valleyWidth = 0.5, const std::string& material = "Au") {
 		profile_ = RectangularProfile;
 		period_ = period;
 		geo_[0] = height;
@@ -130,7 +130,7 @@ public:
 class PEBlazedGrating : public PEGrating {
 public:
 	/// Constructs a grating with the blazed profile. The required geometry parameters are the blaze angle \c blazeAngleDeg, in deg., and the anti-blaze angle \c antiBlazeAngleDeg.
-	PEBlazedGrating(double period = 1.0e-6, double blazeAngleDeg = 2.0, double antiBlazeAngleDeg = 30, const std::string& material = "Au") {
+	PEBlazedGrating(double period = 1.0, double blazeAngleDeg = 2.0, double antiBlazeAngleDeg = 30, const std::string& material = "Au") {
 		profile_ = BlazedProfile;
 		period_ = period;
 		geo_[0] = blazeAngleDeg;
@@ -142,8 +142,8 @@ public:
 /// Sinusoidal grating subclass
 class PESinusoidalGrating : public PEGrating {
 public:
-	/// Constructs a grating with a perfect sinusoidal profile. The only required geometry parameter is the groove \c height, in m.
-	PESinusoidalGrating(double period = 1.0e-6, double height = 0.05e-6, const std::string& material = "Au") {
+	/// Constructs a grating with a perfect sinusoidal profile. The only required geometry parameter is the groove \c height, in um.
+	PESinusoidalGrating(double period = 1.0, double height = 0.05, const std::string& material = "Au") {
 		profile_ = BlazedProfile;
 		period_ = period;
 		geo_[0] = height;
@@ -154,8 +154,8 @@ public:
 /// Trapezoidal grating subclass
 class PETrapezoidalGrating : public PEGrating {
 public:
-	/// Constructs a grating with a trapezoidal profile. The required geometry parameters are the \c height, in m, the \c valleyWidth, in m, the blaze angle \c blazeAngleDeg, in deg., and the anti-blaze angle \c antiBlazeAngleDeg.
-	PETrapezoidalGrating(double period = 1.0e-6, double height = 0.05e-6, double valleyWidth = 0.5e-6, double blazeAngleDeg = 30.0, double antiBlazeAngleDeg = 30.0, const std::string& material = "Au") {
+	/// Constructs a grating with a trapezoidal profile. The required geometry parameters are the \c height, in um, the \c valleyWidth, in um, the blaze angle \c blazeAngleDeg, in deg., and the anti-blaze angle \c antiBlazeAngleDeg.
+	PETrapezoidalGrating(double period = 1.0, double height = 0.05, double valleyWidth = 0.5, double blazeAngleDeg = 30.0, double antiBlazeAngleDeg = 30.0, const std::string& material = "Au") {
 		profile_ = BlazedProfile;
 		period_ = period;
 		geo_[0] = height;

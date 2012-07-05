@@ -24,7 +24,7 @@ PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo, int numThr
 	// set math options.
 	N_ = mo.N;
 	twoNp1_ = 2*N_ + 1;
-//	niy_ = mo.niy;
+	niy_ = mo.niy;
 	
 	// allocate matrices and vectors
 	u_ = gsl_matrix_complex_alloc(twoNp1_, twoNp1_);
@@ -387,7 +387,7 @@ PEResult::Code PESolver::computeGratingExpansion(double y, gsl_complex* k2) cons
 
 	case PEGrating::RectangularProfile:
 		// For rectangular profiles, geo(0) is the depth, geo(1) is the valley width.
-		if(y > g_.geo(0) + 1e-16) {
+		if(y > g_.geo(0) + 1e-10) {
 			std::cout << "Grating Expansion: Error: Height " << y-0.04 << " is above the grating maximum " << g_.geo(0)-0.04 << std::endl;
 			return PEResult::InvalidGratingFailure;	// above the grating.
 		}
@@ -412,12 +412,9 @@ PEResult::Code PESolver::computeGratingExpansion(double y, gsl_complex* k2) cons
 		x1 = y / tan(blaze);
 		x2 = d - y / tan(antiBlaze);
 		
-		if(x2 < x1 - 1e-16) {
+		if(x2 < x1) {
 			std::cout << "Grating Expansion: Error: Above the grating: x2 is less than x1 by " << x1-x2 << std::endl;
 			return PEResult::InvalidGratingFailure;	// above the grating.
-		}
-		if(x2 < x1) {
-			x2 = x1;
 		}
 		break;
 	}
