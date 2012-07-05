@@ -63,8 +63,8 @@ protected:
 	// 2*N_ + 1, since this is used a lot
 	int twoNp1_;
 	
-	// The number of integration steps to use
-	int niy_;
+//	// The number of integration steps to use
+//	int niy_;
 	
 	
 	// alpha array (size 2N+1)
