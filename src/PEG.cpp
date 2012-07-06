@@ -36,7 +36,8 @@ PEResult PEGrating::getEff(double incidenceDeg, double wl, const PEMathOptions& 
 }
 
 gsl_complex PEGrating::refractiveIndex(double wl) const {
-	return gsl_complex_rect(0.993, -0.00754);
+	return gsl_complex_rect(0.993, 0.00754);
+//	return gsl_complex_rect(1.4, -0.);
 }
 
 double PEGrating::height() const {

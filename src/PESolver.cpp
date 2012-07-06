@@ -128,6 +128,13 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 		// beta1_: rayleigh expansion inside grating
 		gsl_complex k12minusAn2 = gsl_complex_sub_real(gsl_complex_mul(k_1, k_1), alpha*alpha);
 		beta1_[i] = complex_sqrt_upperComplexPlane(k12minusAn2);
+
+//		// TEST:
+//		z = gsl_complex_mul(beta1_[i], beta1_[i]);
+//		if(fabs(GSL_REAL(z) - GSL_REAL(k12minusAn2)) > 1e-5 || fabs(GSL_IMAG(z) - GSL_IMAG(k12minusAn2)) > 1e-5) {
+//			std::cout << "Square root error!: " << GSL_REAL(k12minusAn2) << "," << GSL_IMAG(k12minusAn2) << "\t" << GSL_REAL(z) << "," << GSL_IMAG(z) << std::endl;
+//			exit(-1);
+//		}
 	}
 	
 	if(printDebugOutput) {
@@ -154,28 +161,28 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	gsl_matrix_complex_set_zero(uprime_);
 
 	////////////////////////////////
-	if(printDebugOutput) {
-		std::cout << "Example grating expansion at y = 0.02" << std::endl;
-		gsl_complex* localK2 = k2ForCurrentThread();
-		computeGratingExpansion(0.01, localK2);
+//	if(printDebugOutput) {
+//		std::cout << "Example grating expansion at y = 0.02" << std::endl;
+//		gsl_complex* localK2 = k2ForCurrentThread();
+//		computeGratingExpansion(0.01, localK2);
 
-		// wave number in free space: k_2 = v_2 * w / c.  v_2 = 1 in empty space, so k_2 = 2pi / wl.
-		gsl_complex k_2 = gsl_complex_rect(2 * M_PI / wl_, 0);
-		// wave number in the grating: k_1 = v_1 * w / c = v_1 * 2pi / wl = v_1 * k_2.
-		gsl_complex k_1 = gsl_complex_mul(v_1_, k_2);
+//		// wave number in free space: k_2 = v_2 * w / c.  v_2 = 1 in empty space, so k_2 = 2pi / wl.
+//		gsl_complex k_2 = gsl_complex_rect(2 * M_PI / wl_, 0);
+//		// wave number in the grating: k_1 = v_1 * w / c = v_1 * 2pi / wl = v_1 * k_2.
+//		gsl_complex k_1 = gsl_complex_mul(v_1_, k_2);
 
-		// square them to get k^2_2 and k^2_1:
-		gsl_complex k2_2 = gsl_complex_mul(k_2, k_2);
-		gsl_complex k2_1 = gsl_complex_mul(k_1, k_1);
+//		// square them to get k^2_2 and k^2_1:
+//		gsl_complex k2_2 = gsl_complex_mul(k_2, k_2);
+//		gsl_complex k2_1 = gsl_complex_mul(k_1, k_1);
 
-		std::cout << "k2_2" << GSL_REAL(k2_2) << "," << GSL_IMAG(k2_2) << std::endl;
-		std::cout << "k2_1" << GSL_REAL(k2_1) << "," << GSL_IMAG(k2_1) << std::endl;
+//		std::cout << "k2_2" << GSL_REAL(k2_2) << "," << GSL_IMAG(k2_2) << std::endl;
+//		std::cout << "k2_1" << GSL_REAL(k2_1) << "," << GSL_IMAG(k2_1) << std::endl;
 
-		for(int i=0; i<twoNp1_; ++i) {
-			std::cout << "   " << GSL_REAL(localK2[i]) << "," << GSL_IMAG(localK2[i]);
-		}
-		std::cout << std::endl;
-	}
+//		for(int i=0; i<twoNp1_; ++i) {
+//			std::cout << "   " << GSL_REAL(localK2[i]) << "," << GSL_IMAG(localK2[i]);
+//		}
+//		std::cout << std::endl;
+//	}
 	/////////////////////////////////
 	
 	// Loop over all trial solutions p:  [row: n.  col: p]
@@ -225,7 +232,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 				std::cout << "Final value u'_{p=" << i-N_ << "}(" << g_.height() << "):" <<std::endl;
 				std::cout << "     ";
 				for(int n=0; n<twoNp1_; ++n)
-					std::cout << GSL_REAL(gsl_vector_complex_get(&uprime.vector, n)) << "," << GSL_IMAG(gsl_vector_complex_get(&u.vector, n)) << "    ";
+					std::cout << GSL_REAL(gsl_vector_complex_get(&uprime.vector, n)) << "," << GSL_IMAG(gsl_vector_complex_get(&uprime.vector, n)) << "    ";
 				std::cout << std::endl;
 				std::cout << std::endl;
 			}
@@ -240,21 +247,32 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	// Now we have u(a) and u'(a) in (u, uprime) and in the columns of the actual (u_, uprime_) matrices.
 	
 	// 4. Need to calculate the T matrix that maps the grating input to grating output (in the basis expansion)
+	//        T_np = (1/2)( u_np(a) - u'_np(a) / i beta2_n )
+	//        T = 1/2( u_ - uprime_*iBeta2Diag_
 	/////////////////////////////
 	timing_[5] = omp_get_wtime();
 	
-	// Need a diagonal matrix with components 1/(i*beta2_n).
-	for(int i=0; i<twoNp1_; ++i) {
-		gsl_matrix_complex_set(iBeta2Diag_, i, i, gsl_complex_mul_imag(beta2_[i], 1.0));
-	}
+//	// To calculate uprime_ term, use a diagonal matrix iBeta2Diag_ with components 1/(i*beta2_n).
+//	for(int i=0; i<twoNp1_; ++i) {
+//		gsl_matrix_complex_set(iBeta2Diag_, i, i, gsl_complex_inverse(gsl_complex_mul_imag(beta2_[i], 1.0)));
+//	}
 	
-	// WRONG: The T matrix is = 0.5 * (u_ - iBeta2Diag_ uprime_).  Compute and store back in T_.
-	// RIGHT: The actual matrix should be (iBeta2Diag_ u - uprime), where iBeta2Diag_ is diagonals of i*beta2_n. (Not: 1/(i*beta2_n))
-	// copy uprime_ into T_.
-	gsl_matrix_complex_memcpy(T_, uprime_);
-	// [This function computes C = \alpha A B + \beta C, when A is symmetric.  We will compute it for A = iBeta2Diag_, B = u_, \alpha = 1, \beta = -1, and C = uprime_ = T_.]
-	errCode = gsl_blas_zsymm(CblasLeft, CblasUpper, gsl_complex_rect(1,0), iBeta2Diag_, u_, gsl_complex_rect(-1.0,0), T_);
-	if(errCode) return PEResult(PEResult::AlgebraError);
+//	// The T matrix is = 0.5 * (u_ - iBeta2Diag_ uprime_).  Compute and store back in T_.
+//	// Copy u_ into T_
+//	gsl_matrix_complex_memcpy(T_, u_);
+//	// [This function computes C = \alpha A B + \beta C, when A is symmetric.  We will compute it for A = iBeta2Diag_, B = uprime_, \alpha = -0.5, \beta = 0.5, and C = u_ = T_.]
+////	errCode = gsl_blas_zsymm(CblasLeft, CblasUpper, gsl_complex_rect(-0.5,0), iBeta2Diag_, uprime_, gsl_complex_rect(0.5,0), T_);
+//	errCode = gsl_blas_zgemm(CblasNoTrans, CblasNoTrans, gsl_complex_rect(-0.5,0), iBeta2Diag_, uprime_, gsl_complex_rect(0.5,0), T_);
+//	if(errCode) return PEResult(PEResult::AlgebraError);
+
+	for(int i=0; i<twoNp1_; ++i) { // loop over rows (n)
+		z = gsl_complex_mul_imag(beta2_[i], 1.0);		// = i beta2_n
+		for(int j=0; j<twoNp1_; ++j) { // loop over cols (p)
+			gsl_matrix_complex_set(T_, i, j, gsl_complex_mul_real(gsl_complex_sub(gsl_matrix_complex_get(u_, i, j), gsl_complex_div(gsl_matrix_complex_get(uprime_, i, j), z)), 0.5));
+		}
+	}
+
+
 
 	//////////////////////////////////////
 	if(printDebugOutput) {
@@ -276,8 +294,8 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	// 5. Set up the input (incidence) basis vector Vincident_
 	/////////////////////////////
 	
-	// fill out the incidence matrix Vincident_: when n=0, Vincident_0 = i(beta2_0 + beta1_0)*exp(-i*beta2_0*a). For all other n, Vincident_ = 0 (still).
-	z = gsl_complex_mul_imag(gsl_complex_mul(gsl_complex_add(beta2_[N_], beta1_[N_]), gsl_complex_exp(gsl_complex_mul_imag(beta2_[N_], -a))), 1.0);
+	// fill out the incidence matrix Vincident_: when n=0, Vincident_0 = A2_0*exp(-i*beta2_0*a)=exp(-i*beta2_0*a). For all other n, Vincident_ = 0.
+	z = gsl_complex_exp(gsl_complex_mul_imag(beta2_[N_], -a));
 	if(printDebugOutput) {
 		std::cout << "\nIncident vector component Vincident_0: " << GSL_REAL(z) << "," << GSL_IMAG(z) << std::endl;
 	}
@@ -303,7 +321,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	////////////////////////////////
 	timing_[6] = omp_get_wtime();
 	
-	// Now we have A1_.  Need to get B2_.  From eqn. II.18, \sum_p { A^(1)_p u_{np}(a) } - A2_0 exp(-i beta2_0 a) \delta_{n,0} = B2_n exp(-i beta2_n a)
+	// Now we have A1_.  Need to get B2_.  From eqn. II.18, \sum_p { A^(1)_p u_{np}(a) } - A2_0 exp(-i beta2_0 a) \delta_{n,0} = B2_n exp(i beta2_n a)
 	// The sum can be computed by the matrix-vector multiplication (u_ A1_).
 	errCode = gsl_blas_zgemv(CblasNoTrans, gsl_complex_rect(1,0), u_, A1_, gsl_complex_rect(0,0), B2_);
 	if(errCode) return PEResult(PEResult::AlgebraError);
@@ -358,7 +376,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	}
 
 	if(printDebugOutput) {
-		std::cout << "Sum of efficiencies (should be 1): " << effSum << std::endl;
+		std::cout << "Sum of efficiencies (should be <= 1): " << effSum << std::endl;
 	}
 	
 	return result;
@@ -412,10 +430,13 @@ PEResult::Code PESolver::computeGratingExpansion(double y, gsl_complex* k2) cons
 		x1 = y / tan(blaze);
 		x2 = d - y / tan(antiBlaze);
 		
-		if(x2 < x1) {
+		if(x2 < x1 - 1e-10) {
 			std::cout << "Grating Expansion: Error: Above the grating: x2 is less than x1 by " << x1-x2 << std::endl;
 			return PEResult::InvalidGratingFailure;	// above the grating.
 		}
+		if(x2 < x1)
+			x2 = x1;
+
 		break;
 	}
 		
@@ -492,7 +513,6 @@ PEResult::Code PESolver::integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl
 	
 	// setup driver
 	gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_standard_new (&odeSys, gsl_odeiv2_step_msadams, hStart, 1e-8, 1e-8, 0.5, 0.5);
-
 	
 	// fill starting conditions from u, uprime
 	double* w = new double[8*N_+4];
@@ -510,6 +530,7 @@ PEResult::Code PESolver::integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl
 	// run it: integrate from y = 0 to gratingHeight.
 	double y = 0;
 	int status = gsl_odeiv2_driver_apply (d, &y, gratingHeight, w);
+//	int status = gsl_odeiv2_driver_apply_fixed_step(d, &y, gratingHeight/1000, 1000, w);
 	if (status != GSL_SUCCESS) {
 		std::cout << "ODE: Integration failure: Code: " << status << std::endl;
 		return PEResult::ConvergenceFailure;
