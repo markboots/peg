@@ -316,7 +316,7 @@ void writeOutputFileResult(std::ostream& of, const PEResult& result, const PECom
 	case PEResult::InsufficientCoefficientsFailure:
 		of << "Error:InsufficientCoefficientsFailure" << std::endl;
 		break;
-	case PEResult::AlgebraError:
+	case PEResult::AlgebraFailure:
 		of << "Error:AlgebraError" << std::endl;
 		break;
 	case PEResult::OtherFailure:
@@ -324,6 +324,9 @@ void writeOutputFileResult(std::ostream& of, const PEResult& result, const PECom
 		break;
 	case PEResult::InactiveCalculation:
 		of << "Error:InactiveCalculation" << std::endl;
+		break;
+	case PEResult::MissingRefractiveDataFailure:
+		of << "Error:MissingRefractiveIndexData" << std::endl;
 		break;
 	case PEResult::Success:
 		for(int i=0, cc=result.eff.size(); i<cc; ++i) {

@@ -11,12 +11,15 @@
 // h*c (Planck constant * speed of light), in eV * um.  Used in conversion from eV to um.
 #define M_HC 1.23984172
 
+// Path to materials database (folder)
+#define PEG_MATERIALS_DB_PATH "materialDatabase"
+
 // Common definitions for the PEG parallel grating efficiency library
 
 /// This type is returned by a single grating efficiency calculation. It contains a status code/error code to indicate the result of the calculation, a vector of inside order efficiencies, and a vector of outside order efficiencies. The first element in the output vectors is the 0 order, and is duplicated over both.
 class PEResult {
 public:
-	enum Code { Success, InvalidGratingFailure, ConvergenceFailure, InsufficientCoefficientsFailure, AlgebraError, OtherFailure, InactiveCalculation };
+	enum Code { Success, InvalidGratingFailure, ConvergenceFailure, InsufficientCoefficientsFailure, AlgebraFailure, MissingRefractiveDataFailure, OtherFailure, InactiveCalculation };
 	
 	/// Constructs an empty result with the given \c statusCode
 	PEResult(Code statusCode = OtherFailure) { status = statusCode; }
@@ -93,7 +96,7 @@ public:
 	std::string material() const { return material_; }
 	
 	
-	/// Returns the complex refractive index at a given wavelength \c wl in um. \todo Imp. Current is Pt at 410 eV.
+	/// Returns the complex refractive index at a given wavelength \c wl in um.  Returns gsl_complex_rect(0,0) if the grating's material database was not found.
 	gsl_complex refractiveIndex(double wl) const;
 	
 	

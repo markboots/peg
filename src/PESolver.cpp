@@ -83,6 +83,9 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	wl_ = wl;
 	// get refractive index at wavelength
 	v_1_ = g_.refractiveIndex(wl_);
+	if(GSL_REAL(v_1_) == 0.0 && GSL_IMAG(v_1_) == 0.0) {
+		return PEResult(PEResult::MissingRefractiveDataFailure);
+	}
 	
 	// incidence angle in radians
 	double theta_2 = incidenceDeg * M_PI / 180;
@@ -102,9 +105,10 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	double a = g_.height();
 	
 	if(printDebugOutput) {
-		std::cout << "\nWavelength wl (um):" << wl_ << std::endl;
+		std::cout << "\nWavelength wl (um): " << wl_ << std::endl;
+		std::cout << "Refractive index: " << GSL_REAL(v_1_) << ", " << GSL_IMAG(v_1_) << std::endl;
 		std::cout << "Grating height a (um): " << a << std::endl;
-		std::cout << "Grating period (um):" << d << std::endl;
+		std::cout << "Grating period (um): " << d << std::endl;
 	}
 	
 	// 2. compute all alpha_n and beta1_n, beta2_n.  (This can be a parallel loop)
@@ -252,26 +256,28 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	/////////////////////////////
 	timing_[5] = omp_get_wtime();
 	
-//	// To calculate uprime_ term, use a diagonal matrix iBeta2Diag_ with components 1/(i*beta2_n).
-//	for(int i=0; i<twoNp1_; ++i) {
-//		gsl_matrix_complex_set(iBeta2Diag_, i, i, gsl_complex_inverse(gsl_complex_mul_imag(beta2_[i], 1.0)));
-//	}
-	
-//	// The T matrix is = 0.5 * (u_ - iBeta2Diag_ uprime_).  Compute and store back in T_.
-//	// Copy u_ into T_
-//	gsl_matrix_complex_memcpy(T_, u_);
-//	// [This function computes C = \alpha A B + \beta C, when A is symmetric.  We will compute it for A = iBeta2Diag_, B = uprime_, \alpha = -0.5, \beta = 0.5, and C = u_ = T_.]
-////	errCode = gsl_blas_zsymm(CblasLeft, CblasUpper, gsl_complex_rect(-0.5,0), iBeta2Diag_, uprime_, gsl_complex_rect(0.5,0), T_);
-//	errCode = gsl_blas_zgemm(CblasNoTrans, CblasNoTrans, gsl_complex_rect(-0.5,0), iBeta2Diag_, uprime_, gsl_complex_rect(0.5,0), T_);
-//	if(errCode) return PEResult(PEResult::AlgebraError);
-
-	for(int i=0; i<twoNp1_; ++i) { // loop over rows (n)
-		z = gsl_complex_mul_imag(beta2_[i], 1.0);		// = i beta2_n
-		for(int j=0; j<twoNp1_; ++j) { // loop over cols (p)
-			gsl_matrix_complex_set(T_, i, j, gsl_complex_mul_real(gsl_complex_sub(gsl_matrix_complex_get(u_, i, j), gsl_complex_div(gsl_matrix_complex_get(uprime_, i, j), z)), 0.5));
-		}
+	// To calculate uprime_ term, use a diagonal matrix iBeta2Diag_ with components 1/(i*beta2_n).
+	for(int i=0; i<twoNp1_; ++i) {
+		gsl_matrix_complex_set(iBeta2Diag_, i, i, gsl_complex_inverse(gsl_complex_mul_imag(beta2_[i], 1.0)));
 	}
+	
+	// The T matrix is = 0.5 * (u_ - iBeta2Diag_ uprime_).  Compute and store back in T_.
+	// Copy u_ into T_
+	gsl_matrix_complex_memcpy(T_, u_);
+	// [This function computes C = \alpha A B + \beta C, when A is symmetric.  We will compute it for A = iBeta2Diag_, B = uprime_, \alpha = -0.5, \beta = 0.5, and C = u_ = T_.]
+	errCode = gsl_blas_zsymm(CblasLeft, CblasUpper, gsl_complex_rect(-0.5,0), iBeta2Diag_, uprime_, gsl_complex_rect(0.5,0), T_);
+//	errCode = gsl_blas_zgemm(CblasNoTrans, CblasNoTrans, gsl_complex_rect(-0.5,0), iBeta2Diag_, uprime_, gsl_complex_rect(0.5,0), T_);
+	if(errCode) return PEResult(PEResult::AlgebraFailure);
 
+//	Alternative: setting element by element.  Either is fine for performance; this is simpler to validate the math.
+/////////
+//	for(int i=0; i<twoNp1_; ++i) { // loop over rows (n)
+//		z = gsl_complex_mul_imag(beta2_[i], 1.0);		// = i beta2_n
+//		for(int j=0; j<twoNp1_; ++j) { // loop over cols (p)
+//			gsl_matrix_complex_set(T_, i, j, gsl_complex_mul_real(gsl_complex_sub(gsl_matrix_complex_get(u_, i, j), gsl_complex_div(gsl_matrix_complex_get(uprime_, i, j), z)), 0.5));
+//		}
+//	}
+//////////
 
 
 	//////////////////////////////////////
@@ -306,9 +312,9 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	
 	int s;
 	errCode = gsl_linalg_complex_LU_decomp(T_, permutation_, &s);
-	if(errCode) return PEResult(PEResult::AlgebraError);
+	if(errCode) return PEResult(PEResult::AlgebraFailure);
 	errCode = gsl_linalg_complex_LU_solve(T_, permutation_, Vincident_, A1_);
-	if(errCode) return PEResult(PEResult::AlgebraError);
+	if(errCode) return PEResult(PEResult::AlgebraFailure);
 	
 	if(printDebugOutput) {
 		std::cout << "\nA1_:" << std::endl;
@@ -324,7 +330,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	// Now we have A1_.  Need to get B2_.  From eqn. II.18, \sum_p { A^(1)_p u_{np}(a) } - A2_0 exp(-i beta2_0 a) \delta_{n,0} = B2_n exp(i beta2_n a)
 	// The sum can be computed by the matrix-vector multiplication (u_ A1_).
 	errCode = gsl_blas_zgemv(CblasNoTrans, gsl_complex_rect(1,0), u_, A1_, gsl_complex_rect(0,0), B2_);
-	if(errCode) return PEResult(PEResult::AlgebraError);
+	if(errCode) return PEResult(PEResult::AlgebraFailure);
 	// now we need to subtract exp(-i beta2_0 a) when n = 0:
 	gsl_complex temp = gsl_complex_exp(gsl_complex_mul_imag(beta2_[N_], -a));
 	temp = gsl_complex_sub(gsl_vector_complex_get(B2_, N_), temp);
@@ -512,7 +518,8 @@ PEResult::Code PESolver::integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl
 	double hStart = gratingHeight / 200.0;
 	
 	// setup driver
-	gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_standard_new (&odeSys, gsl_odeiv2_step_msadams, hStart, 1e-8, 1e-8, 0.5, 0.5);
+	gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_standard_new (&odeSys, gsl_odeiv2_step_msadams, hStart, 1e-8, 1e-8, 0.5, 0.5);	// Variable-coefficient linear multistep Adams method in Nordsieck form. Uses explicit Adams-Bashforth (predictor) and implicit Adams-Moulton (corrector) methods in P(EC)^m functional iteration mode.
+//	gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_standard_new (&odeSys, gsl_odeiv2_step_rkf45, hStart, 1e-8, 1e-8, 0.5, 0.5); // Explicit embedded Runge-Kutta-Fehlberg (4, 5) method.
 	
 	// fill starting conditions from u, uprime
 	double* w = new double[8*N_+4];
@@ -530,7 +537,7 @@ PEResult::Code PESolver::integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl
 	// run it: integrate from y = 0 to gratingHeight.
 	double y = 0;
 	int status = gsl_odeiv2_driver_apply (d, &y, gratingHeight, w);
-//	int status = gsl_odeiv2_driver_apply_fixed_step(d, &y, gratingHeight/1000, 1000, w);
+//	int status = gsl_odeiv2_driver_apply_fixed_step(d, &y, gratingHeight/200, 200, w);
 	if (status != GSL_SUCCESS) {
 		std::cout << "ODE: Integration failure: Code: " << status << std::endl;
 		return PEResult::ConvergenceFailure;
@@ -559,18 +566,23 @@ int PESolver::odeFunction(double y, const double w[], double dwdy[]) {
 		return GSL_EBADFUNC;	// can't calculate here. Invalid profile? y above the profile height?
 	}
 	
-	int fourNp2 = 4*N_+2;	// fourNp2 divides the top and bottom of the arrays w, f.  Top of w is u; bottom of w is u' = v.   Top of f is u' = v;  bottom of f is v' = u''.
+	int fourNp2 = 4*N_+2;	// fourNp2 divides the top and bottom of the arrays w, dwdy.  Top of w is u; bottom of w is u' = v.   Top of dwdy is u';  bottom of dwdy is u''.
 	int eightNp4 = 8*N_+4;
 	// size is (2N+1)x2x2, ie: 8N+4.
 	for(int i=0; i<fourNp2; ++i) {
-		// working on computing u'_n = v. [top of f array]. Just copy from v = u' = [bottom half of w array]
+		// working on computing u'_n [top of dwdy array]. Just copy from u' = [bottom half of w array]
 		dwdy[i] = w[i + fourNp2];
 	}
 
 	for(int i=fourNp2; i<eightNp4; i+=2) {
-		// working on computing v'_n = u''_n [bottom of f array].  We'll handle real and imaginary components at once.
+		// working on computing u''_n [bottom of f array].  We'll handle real and imaginary components at once.
 		int n = (i - fourNp2)/2 - N_;
 		gsl_complex upp_n = gsl_complex_rect(0,0);	// initialize sum to 0.
+
+		// alpha^2_n:
+		double alpha2 = alpha_[n + N_];
+		alpha2 *= alpha2;
+
 		// loop over m.  Retrieving u_n values from top of array.
 		for(int j=0; j<fourNp2; j+=2) { // also handling real and imaginary components at once.
 			int m = j/2 - N_;
@@ -581,7 +593,7 @@ int PESolver::odeFunction(double y, const double w[], double dwdy[]) {
 			if(n-m >= -N_ && n-m <= N_)
 				M_nm = gsl_complex_mul_real(localK2[n-m + N_], -1.0);	// -k^2_{n-m}
 			if(n == m)
-				M_nm = gsl_complex_add_real(M_nm, alpha_[n + N_]);
+				M_nm = gsl_complex_add_real(M_nm, alpha2);
 
 			upp_n = gsl_complex_add(upp_n, gsl_complex_mul(M_nm, u_m));
 		}
@@ -633,6 +645,10 @@ int PESolver::odeJacobian(double y, const double w[], double *dfdw, double dfdy[
 	for(int i=fourNp2; i<eightNp4; i+=2) {
 		int n = (i - fourNp2)/2 - N_;	// n index [row] from -N to N.
 
+		// alpha^2_n:
+		double alpha2 = alpha_[n + N_];
+		alpha2 *= alpha2;
+
 		// loop over m [col].
 		for(int j=0; j<fourNp2; j+=2) { // also handling real and imaginary components at once.
 			int m = j/2 - N_;	// m index [col] from -N to N.
@@ -642,7 +658,7 @@ int PESolver::odeJacobian(double y, const double w[], double *dfdw, double dfdy[
 			if(n-m >= -N_ && n-m <= N_)
 				M_nm = gsl_complex_mul_real(localK2[n-m + N_], -1.0);	// k2_ ranges from -N to N.
 			if(n == m)
-				M_nm = gsl_complex_add_real(M_nm, alpha_[n + N_]);
+				M_nm = gsl_complex_add_real(M_nm, alpha2);
 
 			// set 4x4 matrix here: [M_re, -M_im; M_im, M_re] at (i,j), (i, j+1); (i+1, j), (i+1, j+1)
 			dfdw[i*eightNp4 + j] = GSL_REAL(M_nm);
