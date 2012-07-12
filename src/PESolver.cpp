@@ -24,14 +24,11 @@ PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo, int numThr
 	// set math options.
 	N_ = mo.N;
 	twoNp1_ = 2*N_ + 1;
-	niy_ = mo.niy;
+	integrationTolerance_ = 1e-8;
 	
 	// allocate matrices and vectors
-	u_ = gsl_matrix_complex_alloc(twoNp1_, twoNp1_);
-	uprime_ = gsl_matrix_complex_alloc(twoNp1_, twoNp1_);
-	iBeta2Diag_ = gsl_matrix_complex_alloc(twoNp1_, twoNp1_);
+	wVectors_ = new double[(8*N_+4) * twoNp1_];	// individual size: (2N_+1) x 2(for re,im) x 2(for u,prime) x (2N_+1) trial solutions.
 	T_ = gsl_matrix_complex_alloc(twoNp1_, twoNp1_);
-	gsl_matrix_complex_set_zero(iBeta2Diag_);
 	Vincident_ = gsl_vector_complex_alloc(twoNp1_);
 	gsl_vector_complex_set_zero(Vincident_);
 	A1_ = gsl_vector_complex_alloc(twoNp1_);
@@ -53,9 +50,6 @@ PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo, int numThr
 
 
 PESolver::~PESolver() {
-	gsl_matrix_complex_free(u_);
-	gsl_matrix_complex_free(uprime_);
-	gsl_matrix_complex_free(iBeta2Diag_);
 	gsl_matrix_complex_free(T_);
 	gsl_vector_complex_free(Vincident_);
 	gsl_vector_complex_free(A1_);
@@ -65,6 +59,8 @@ PESolver::~PESolver() {
 	delete [] alpha_;
 	delete [] beta2_;
 	delete [] beta1_;
+	delete [] wVectors_;
+
 	for(int i=0; i<numThreads_; ++i)
 		delete [] k2_[i];
 	delete [] k2_;
@@ -158,11 +154,6 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	// 3. set up trial solutions at y=0, and then integrate their ODEs from y=0 to y=a.
 	////////////////////////////////////////
 	timing_[4] = omp_get_wtime();
-	
-	// u_ should be the identify matrix
-	gsl_matrix_complex_set_identity(u_);
-	// zero uprime_; we will set the components we need to below.
-	gsl_matrix_complex_set_zero(uprime_);
 
 	////////////////////////////////
 //	if(printDebugOutput) {
@@ -195,48 +186,45 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 #pragma omp parallel for num_threads(numThreads_) schedule(static,1)
 	for(int i=0; i<twoNp1_; ++i) {
 		// int p = i - N_;
+
+		double* w = wVectorForP(i);
 		
-		// insert initial values at y=0.  u(0) = 1* \delta_{np}.  (Already set: identity matrix)
-		// u'(0) = -i * beta^(1)_n \delta_{np}
-		gsl_matrix_complex_set(uprime_, i, i, gsl_complex_mul_imag(beta1_[i], -1));
-		
-		// create vector views: the column vectors for this trial solution
-		gsl_vector_complex_view u = gsl_matrix_complex_column(u_, i);
-		gsl_vector_complex_view uprime = gsl_matrix_complex_column(uprime_, i);
+		// insert initial values at y=yStart=0.  u(yStart) = 1* \delta_{np}.  u'(yStart) = -i * beta^(1)_n \delta_{np}
+		setIntegrationStartingValues(w, i);
 
 		////////////////////////////
 		if(printDebugOutput && omp_get_thread_num() == 0) {
 			std::cout << "Initial value u_{p=" << i-N_ << "}(0):" <<std::endl;
 			std::cout << "     ";
 			for(int n=0; n<twoNp1_; ++n)
-				std::cout << GSL_REAL(gsl_vector_complex_get(&u.vector, n)) << "," << GSL_IMAG(gsl_vector_complex_get(&u.vector, n)) << "    ";
+				std::cout << w[2*n] << "," << w[2*n+1] << "    ";
 			std::cout << std::endl;
 			std::cout << "Initial value u'_{p=" << i-N_ << "}(0):" <<std::endl;
 			std::cout << "     ";
 			for(int n=0; n<twoNp1_; ++n)
-				std::cout << GSL_REAL(gsl_vector_complex_get(&uprime.vector, n)) << "," << GSL_IMAG(gsl_vector_complex_get(&uprime.vector, n)) << "    ";
+				std::cout << w[4*N_+2 + 2*n] << "," << w[4*N_+2 + 2*n+1] << "    ";
 			std::cout << std::endl;
 			std::cout << std::endl;
 		}
 		//////////////////////////
 		
 		// need to integrate u and uprime along y, using d^2 u/dy^2 = M(y) u
-		PEResult::Code err = integrateTrialSolutionAlongY(&u.vector, &uprime.vector);
+		PEResult::Code err = integrateTrialSolutionAlongY(w, 0.0, g_.height());
 		if(err != PEResult::Success)
 			integrationFailureOccurred = true;	// We used to exit the loop here, but that is not allowed in an OpenMP parallel for.  Set this flag instead.  It is only written, but not read, by different threads, so we should be OK.
 
 		//////////////////////////
 		if(printDebugOutput && omp_get_thread_num() == 0) {
 			if(err == PEResult::Success) {
-				std::cout << "Final value u_{p=" << i-N_ << "}(" << g_.height() << "):" <<std::endl;
+				std::cout << "Final value u_{p=" << i-N_ << "}(0):" <<std::endl;
 				std::cout << "     ";
 				for(int n=0; n<twoNp1_; ++n)
-					std::cout << GSL_REAL(gsl_vector_complex_get(&u.vector, n)) << "," << GSL_IMAG(gsl_vector_complex_get(&u.vector, n)) << "    ";
+					std::cout << w[2*n] << "," << w[2*n+1] << "    ";
 				std::cout << std::endl;
-				std::cout << "Final value u'_{p=" << i-N_ << "}(" << g_.height() << "):" <<std::endl;
+				std::cout << "Final value u'_{p=" << i-N_ << "}(0):" <<std::endl;
 				std::cout << "     ";
 				for(int n=0; n<twoNp1_; ++n)
-					std::cout << GSL_REAL(gsl_vector_complex_get(&uprime.vector, n)) << "," << GSL_IMAG(gsl_vector_complex_get(&uprime.vector, n)) << "    ";
+					std::cout << w[4*N_+2 + 2*n] << "," << w[4*N_+2 + 2*n+1] << "    ";
 				std::cout << std::endl;
 				std::cout << std::endl;
 			}
@@ -248,36 +236,19 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	if(integrationFailureOccurred)
 		return PEResult(PEResult::ConvergenceFailure);
 	
-	// Now we have u(a) and u'(a) in (u, uprime) and in the columns of the actual (u_, uprime_) matrices.
+	// Now we have u(a) and u'(a) in w.
 	
 	// 4. Need to calculate the T matrix that maps the grating input to grating output (in the basis expansion)
 	//        T_np = (1/2)( u_np(a) - u'_np(a) / i beta2_n )
-	//        T = 1/2( u_ - uprime_*iBeta2Diag_
 	/////////////////////////////
 	timing_[5] = omp_get_wtime();
 	
-	// To calculate uprime_ term, use a diagonal matrix iBeta2Diag_ with components 1/(i*beta2_n).
-	for(int i=0; i<twoNp1_; ++i) {
-		gsl_matrix_complex_set(iBeta2Diag_, i, i, gsl_complex_inverse(gsl_complex_mul_imag(beta2_[i], 1.0)));
+	for(int i=0; i<twoNp1_; ++i) { // loop over rows (n)
+		z = gsl_complex_mul_imag(beta2_[i], 1.0);		// = i beta2_n
+		for(int j=0; j<twoNp1_; ++j) { // loop over cols (p)
+			gsl_matrix_complex_set(T_, i, j, gsl_complex_mul_real(gsl_complex_sub(*u(i,j), gsl_complex_div(*uprime(i,j), z)), 0.5));
+		}
 	}
-	
-	// The T matrix is = 0.5 * (u_ - iBeta2Diag_ uprime_).  Compute and store back in T_.
-	// Copy u_ into T_
-	gsl_matrix_complex_memcpy(T_, u_);
-	// [This function computes C = \alpha A B + \beta C, when A is symmetric.  We will compute it for A = iBeta2Diag_, B = uprime_, \alpha = -0.5, \beta = 0.5, and C = u_ = T_.]
-	errCode = gsl_blas_zsymm(CblasLeft, CblasUpper, gsl_complex_rect(-0.5,0), iBeta2Diag_, uprime_, gsl_complex_rect(0.5,0), T_);
-//	errCode = gsl_blas_zgemm(CblasNoTrans, CblasNoTrans, gsl_complex_rect(-0.5,0), iBeta2Diag_, uprime_, gsl_complex_rect(0.5,0), T_);
-	if(errCode) return PEResult(PEResult::AlgebraFailure);
-
-//	Alternative: setting element by element.  Either is fine for performance; this is simpler to validate the math.
-/////////
-//	for(int i=0; i<twoNp1_; ++i) { // loop over rows (n)
-//		z = gsl_complex_mul_imag(beta2_[i], 1.0);		// = i beta2_n
-//		for(int j=0; j<twoNp1_; ++j) { // loop over cols (p)
-//			gsl_matrix_complex_set(T_, i, j, gsl_complex_mul_real(gsl_complex_sub(gsl_matrix_complex_get(u_, i, j), gsl_complex_div(gsl_matrix_complex_get(uprime_, i, j), z)), 0.5));
-//		}
-//	}
-//////////
 
 
 	//////////////////////////////////////
@@ -328,9 +299,15 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	timing_[6] = omp_get_wtime();
 	
 	// Now we have A1_.  Need to get B2_.  From eqn. II.18, \sum_p { A^(1)_p u_{np}(a) } - A2_0 exp(-i beta2_0 a) \delta_{n,0} = B2_n exp(i beta2_n a)
-	// The sum can be computed by the matrix-vector multiplication (u_ A1_).
-	errCode = gsl_blas_zgemv(CblasNoTrans, gsl_complex_rect(1,0), u_, A1_, gsl_complex_rect(0,0), B2_);
-	if(errCode) return PEResult(PEResult::AlgebraFailure);
+	for(int i=0; i<twoNp1_; ++i) {	// loop over orders n
+		// compute the sum: \sum_p { A^(1)_p u_{np}(a) }
+		gsl_complex sum = gsl_complex_rect(0,0);
+		for(int j=0; j<twoNp1_; ++j) {	// loop over trial solutions p
+			sum = gsl_complex_add(sum, gsl_complex_mul(gsl_vector_complex_get(A1_, j), *u(i,j)));
+		}
+		gsl_vector_complex_set(B2_, i, sum);
+	}
+
 	// now we need to subtract exp(-i beta2_0 a) when n = 0:
 	gsl_complex temp = gsl_complex_exp(gsl_complex_mul_imag(beta2_[N_], -a));
 	temp = gsl_complex_sub(gsl_vector_complex_get(B2_, N_), temp);
@@ -509,18 +486,8 @@ PEResult::Code PESolver::computeGratingExpansion(double y, gsl_complex* k2) cons
 	return PEResult::Success;
 }
 
-PEResult::Code PESolver::integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl_vector_complex* uprime) {
-	// define ode solving system, with our function to evaluate dw/dy, no Jacobian, and 8*N_+4 components.
-	gsl_odeiv2_system odeSys = {odeFunctionCB, odeJacobianCB, 8*N_+4, this};
-	
-	// initial starting step in y: choose grating height / 200.
-	double gratingHeight = g_.height();
-	double hStart = gratingHeight / 200.0;
-	
-	// setup driver
-	gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_standard_new (&odeSys, gsl_odeiv2_step_msadams, hStart, 1e-8, 1e-8, 0.5, 0.5);	// Variable-coefficient linear multistep Adams method in Nordsieck form. Uses explicit Adams-Bashforth (predictor) and implicit Adams-Moulton (corrector) methods in P(EC)^m functional iteration mode.
-//	gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_standard_new (&odeSys, gsl_odeiv2_step_rkf45, hStart, 1e-8, 1e-8, 0.5, 0.5); // Explicit embedded Runge-Kutta-Fehlberg (4, 5) method.
-	
+PEResult::Code PESolver::integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl_vector_complex* uprime, double yStart, double yEnd) {
+
 	// fill starting conditions from u, uprime
 	double* w = new double[8*N_+4];
 	int fourNp2 = 4*N_+2;
@@ -534,14 +501,8 @@ PEResult::Code PESolver::integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl
 		w[2*i + fourNp2 + 1] = GSL_IMAG(uprime_n);
 	}
 	
-	// run it: integrate from y = 0 to gratingHeight.
-	double y = 0;
-	int status = gsl_odeiv2_driver_apply (d, &y, gratingHeight, w);
-//	int status = gsl_odeiv2_driver_apply_fixed_step(d, &y, gratingHeight/200, 200, w);
-	if (status != GSL_SUCCESS) {
-		std::cout << "ODE: Integration failure: Code: " << status << std::endl;
-		return PEResult::ConvergenceFailure;
-	}
+	// integrate it:
+	PEResult::Code status = integrateTrialSolutionAlongY(w, yStart, yEnd);
 	
 	// copy results back into u, uprime
 	for(int i=0; i<twoNp1_; ++i) {
@@ -549,8 +510,33 @@ PEResult::Code PESolver::integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl
 		gsl_vector_complex_set(uprime, i, gsl_complex_rect(w[2*i + fourNp2], w[2*i + fourNp2 + 1]));
 	}
 	
-	gsl_odeiv2_driver_free(d);
 	delete [] w;
+	return status;
+}
+
+PEResult::Code PESolver::integrateTrialSolutionAlongY(double *w, double yStart, double yEnd) {
+	// define ode solving system, with our function to evaluate dw/dy, the Jacobian, and 8*N_+4 components.
+	gsl_odeiv2_system odeSys = {odeFunctionCB, odeJacobianCB, 8*N_+4, this};
+
+	// initial starting step in y: choose grating height / 200.
+	double hStart = (yEnd - yStart)/200;
+
+	// setup driver
+	gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_standard_new (&odeSys, gsl_odeiv2_step_msadams, hStart, integrationTolerance_, integrationTolerance_, 0.5, 0.5);	// Variable-coefficient linear multistep Adams method in Nordsieck form. Uses explicit Adams-Bashforth (predictor) and implicit Adams-Moulton (corrector) methods in P(EC)^m functional iteration mode.
+//	gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_standard_new (&odeSys, gsl_odeiv2_step_rkf45, hStart, integrationTolerance_, integrationTolerance_, 0.5, 0.5); // Explicit embedded Runge-Kutta-Fehlberg (4, 5) method.
+
+	// run it: integrate from y = yStart to y=yEnd.
+	double y = yStart;
+	int status = gsl_odeiv2_driver_apply (d, &y, yEnd, w);
+//	int status = gsl_odeiv2_driver_apply_fixed_step(d, &y, hStart, 200, w);
+
+	gsl_odeiv2_driver_free(d);
+
+	if (status != GSL_SUCCESS) {
+		std::cout << "ODE: Integration failure: Code: " << status << std::endl;
+		return PEResult::ConvergenceFailure;
+	}
+
 	return PEResult::Success;
 }
 
@@ -678,7 +664,7 @@ gsl_complex* PESolver::k2ForCurrentThread() {
 	return k2_[omp_get_thread_num()];
 }
 
-double PESolver::conditionNumber(const gsl_matrix_complex *A) const
+double PESolver::conditionNumber(const gsl_matrix_complex *A)
 {
 	// according to http://en.wikipedia.org/wiki/Condition_number,
 	// When using the 2-norm, cond(A) = max(Singular Values) / min(Singular Values)
@@ -713,4 +699,37 @@ double PESolver::conditionNumber(const gsl_matrix_complex *A) const
 	return 1;
 }
 
+
+int PESolver::linalg_LU_complex_solve(const gsl_matrix_complex *LU, const gsl_permutation *P, const gsl_matrix_complex *B, gsl_matrix_complex *X)  {
+	int n = LU->size1;
+	int status;
+	for(int j=0; j<n; ++j) {
+		gsl_vector_complex_view x = gsl_matrix_complex_column(X, j);
+		gsl_vector_complex_const_view b = gsl_matrix_complex_const_column(B, j);
+
+		status = gsl_linalg_complex_LU_solve(LU, P, &(b.vector), &(x.vector));
+		if(status != GSL_SUCCESS)
+			return status;
+	}
+	return GSL_SUCCESS;
+}
+
+void PESolver::setIntegrationStartingValues(double *w, int p)
+{
+	// set all to 0
+	memset(w, 0, (8*N_+4)*sizeof(double));
+
+	bool secondRound = false;
+	if(p >= twoNp1_) {
+		secondRound = true;
+		p -= twoNp1_;
+	}
+
+	// set u[p] = 1.  Multiplication by 2 is due to {re,im}.
+	w[2*p] = 1.0;
+
+	gsl_complex uprime = gsl_complex_mul_imag(beta1_[p], secondRound ? 1 : -1);	/// \todo change to betaM_[p]
+	w[4*N_+2 + 2*p] = GSL_REAL(uprime);
+	w[4*N_+2 + 2*p+1] = GSL_IMAG(uprime);
+}
 
