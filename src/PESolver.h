@@ -29,6 +29,15 @@ public:
 	// Solving implementation functions
 	////////////////////////////////////////
 
+	/// Computes alpha_, beta1_, and betaM_ for all n, based on v_1_ (material refractive index) and wl_.  Also calculates
+	void computeAlphaAndBeta(double incidenceDeg);
+
+	/// Calculates how many vertical layers (numLayers_ and M_) are sufficient to keep exponentials from contamination.  Fills y_ with the vertical coordinate at each layer.
+	void computeLayers();
+
+	/// Computes the blocks of the T matrix (T11_, T12_, T21_, T22_) for the layer below \c y_[m].  Since \c m = 1 is the top of the substrate, \c m can range from [2, M-1].
+	PEResult::Code computeTMatrixBelowLayer(int m, bool printDebugOutput = false);
+
 	/// Calculates the grating fourier expansion for k^2 at a given \c y value and wavelength \c wl, and stores in \c k2.  \c k2 must have space for 4*N_ + 1 coefficients, since we will be computing from n = -2N_ to 2N.   Reads member variables N_, wavelength wl_, grating refractive index \c v_1_, and grating geometry from \c g_.  Returns PEResult::Success, or PEResult::InvalidGratingFailure if the profile is not supported or \c y is larger than the groove height.
 	PEResult::Code computeGratingExpansion(double y, gsl_complex* k2) const;
 
@@ -58,6 +67,8 @@ public:
 	int odeJacobian(double y, const double w[], double * dfdw, double dfdy[]);
 
 
+	/// Computes the \c BM_ outgoing reflected Rayleigh coefficients, based on a finished S matrix (S12_ block).
+	void computeBMFromSMatrix();
 
 
 
@@ -85,62 +96,72 @@ protected:
 	
 	/// The number of Fourier coefficients
 	int N_;
-	/// 2*N_ + 1, since this is used a lot
-	int twoNp1_;
+	/// 2*N_ + 1, 4*N_+2, and 8*N_+4, since these are used a lot
+	int twoNp1_, fourNp2_, eightNp4_;
 	
 	/// The accuracy to use for numerical integration. Default 1e-8. \todo Get from math options.
 	double integrationTolerance_;
 	
 	
-	// alpha array (size 2N+1)
+	/// alpha array (size 2N+1)
 	double* alpha_;
-	// beta array (size 2N+1)
-	gsl_complex* beta2_, * beta1_;
+	/// beta array (size 2N+1).  betaM_ is for the superstrate, beta1_ is for the substrate.
+	gsl_complex* betaM_, * beta1_;
+	/// B_n^{M} array: outgoing reflected Rayleigh coefficients. (size 2N+1)
+	gsl_complex* BM_;
+
+	/// Number of layers to use in the vertical stack to keep the growing exponentials from numerical contamination.
+	int numLayers_;
+	/// M-2 = numLayers_.
+	int M_;
 	
-	// pre-allocated storage for the grating k^2 fourier coefficients.  There is one array for each thread to use.  Array size must be 4N+1, since we need to compute for n from -2N to 2N.
+	/// pre-allocated storage for the grating k^2 fourier coefficients.  There is one array for each thread to use.  Array size must be 2N+1.
 	gsl_complex** k2_;
-	// Helper function: returns the k^2 array that should be used by a given thread.
+	/// Helper function: returns the k^2 array that should be used by a given thread.
 	gsl_complex* k2ForCurrentThread();
 	
-	// This block of storage contains the [u, uprime] electric field Fourier component vectors. They are arranged with each value in {re,im} sequential order, the u vector followed by uprime vector... repeated for each trial solution.  Access the [u, uprime] vector for a given trial solution with wVectorForP().
+	/// This block of storage contains the [u, uprime] electric field Fourier component vectors. They are arranged with each value {re,im}, from order [-N to N], the u vector followed by uprime vector... repeated for each trial solution.  Access the [u, uprime] vector for a given trial solution with wVectorForP().   The size of one w vector is (8*N_+4), and there are (4*N_+2) trial solutions.
 	double* wVectors_;
 
-	/// Returns the wVector for a trial solution \c p, where \c p is numbered from [0, 2*N_].
-	double* wVectorForP(int p) { return wVectors_ + (8*N_+4)*p; }
-	/// Returns the complex field component \c u for order \c n and trial solution \c p (both numbered from 0 here), out of wVectors_.
-	gsl_complex* u(int n, int p) {
-		return (gsl_complex*)(wVectorForP(p) + 2*n);
+	/// Returns the wVector for a trial solution \c p at index \c j, where \c j is numbered from [0, 4*N_+1].
+	double* wVectorForP(int j) { return wVectors_ + eightNp4_*j; }
+	/// Returns the electric field Fourier component \c u for order \c n (index \c i) and trial solution \c p (index \c j), out of wVectors_.  i and j are numbered from 0.
+	gsl_complex* u(int i, int j) {
+		return (gsl_complex*)(wVectorForP(j) + 2*i);
 	}
-	/// Returns the complex field component derivative \c u' for order \c n and trial solution \c p (both numbered from 0 here), out of wVectors_.
-	gsl_complex* uprime(int n, int p) {
-		return (gsl_complex*)(wVectorForP(p) + 4*N_+2 + 2*n);
+	/// Returns the electric field Fourier component derivative \c u' for order \c n (index \c i) and trial solution \c p (index \c j), out of wVectors_.  i and j are numbered from 0.
+	gsl_complex* uprime(int i, int j) {
+		return (gsl_complex*)(wVectorForP(j) + fourNp2_ + 2*i);
 	}
 
-	// This is the T matrix that relates the input and ouput basis expansion of the grating.
-	gsl_matrix_complex* T_;
-	// This vector describes the incident light in the basis expansion
-	gsl_vector_complex* Vincident_;
-	// This vector contains the rayleigh coefficients A^(1)_n, which also contain the constants of the linear superposition.  T_ A1_ = Vincident_  is an A x = b linear system, that we need to solve for A1_.
-	gsl_vector_complex* A1_;
+	/// Blocks of T matrix, used in computation of a single layer.
+	gsl_matrix_complex* T11_, *T12_, *T21_, *T22_;
+	/// Blocks of S matrix, used in recursive computation of everything up to current layer.
+	gsl_matrix_complex* S12_, *S22_;
+	/// Inverse of Z-matrix, used in computation of S. (Note: we don't actually compute any inverses; Zinv_ is directly calculated from Zinv^{q+1} = T11^{q+1} + T12^{q+1} S12^{1}, and then we use LU decomp and multiplication to avoid loss of precision in computing Z = Zinv_^{-1}.)
+	gsl_matrix_complex* Zinv_;
+	/// This is a 2*N_+1 x 2*N_+1 matrix used as a workspace matrix.
+	gsl_matrix_complex* Z_, * workMatrix_;
+
 	
-	// A permutation structure (size 2*N + 1) used to solve the linear system.
+	/// A permutation structure (size 2*N + 1) used to solve the linear system.
 	gsl_permutation* permutation_;
 	
-	// This vector contains the rayleigh coefficients B^(2)_n, which are essentially the output of the grating solver.
-	gsl_vector_complex* B2_;
-	
 		
-	// wavelength for the current calculation
+	/// wavelength for the current calculation
 	double wl_;
-	// refractive index of the grating material, at wl_
+	/// refractive index of the grating material, at wl_
 	gsl_complex v_1_;
+
+	/// The y-coordinate of the infinitely-thin Rayleigh layer at y_m, with m = [1, M_ - 1].  y_[0] is unused, so that we can take y_m = y_[m].
+	double* y_;
 	
-	// a reference to the grating we're solving
+	/// a reference to the grating we're solving
 	const PEGrating& g_;
 	
-	// A flag that indicates that we should measure the time required for all related blocks of operations
+	/// A flag that indicates that we should measure the time required for all related blocks of operations
 	bool measureTiming_;
-	// Stores the timing results:
+	/// Stores the timing results:
 	double timing_[12];	
 };
 
