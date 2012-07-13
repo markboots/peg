@@ -42,7 +42,8 @@ public:
 	PEResult::Code computeGratingExpansion(double y, gsl_complex* k2) const;
 
 	/// Initializes an 8N+4 array of double [\c u, \c uprime] to contain the starting integration values of the electric field Fourier components. The first half of the array \c w contains \c u, the second half contains \c uprime, with each entry in {re,im} order.  The u value is set to $\delta_{n,p}$ and the u' value is set to $-i \beta_n^{(M)} \delta_{n,p}$ or $i \beta_n^{(M)} \delta_{n,p}$, depending on whether p > 2N_.  (Note n,p here are using numbering from 0, and that for the delta functions, p is aliased back onto [0, 2N] once it reaches 2N_+1.
-	void setIntegrationStartingValues(double* w, int p);
+	/*! If layer \c m = 1, then uses beta1_n instead of betaM_n for the derivative. */
+	void setIntegrationStartingValues(double* w, int p, int m);
 
 	/// Integrates the electric field Fourier component vectors contained in \c w from y = \c yStart to y = \c yEnd, using the differential equation and ______ method.  Array \c w should contain vector \c u followed by \c uprime, with each entry in {re,im} order. Calls computeGratingExpansion() at each y value, so reads member variables N_, v_1_, and g_.  Modifies k2 (for thread) at each step.  Results are returned in-place.
 	PEResult::Code integrateTrialSolutionAlongY(double* w, double yStart, double yEnd);

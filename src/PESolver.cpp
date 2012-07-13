@@ -123,12 +123,11 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	}
 	
 	if(printDebugOutput) {
-		std::cout << "\nbeta2_n:" << std::endl;
+		std::cout << "\nbetaM_n:" << std::endl;
 		for(int i=0; i<twoNp1_; ++i) {
 			std::cout << i - N_ << ":\t" << GSL_REAL(betaM_[i]) << "\t\t" << GSL_IMAG(betaM_[i]) << std::endl;
 		}
 	}
-
 
 	// 3. Recursive computation of S-matrix below each layer.
 	/////////////////////////////////////////////////////////////
@@ -768,7 +767,7 @@ int PESolver::linalg_LU_complex_solve(const gsl_matrix_complex *LU, const gsl_pe
 	return GSL_SUCCESS;
 }
 
-void PESolver::setIntegrationStartingValues(double *w, int j)
+void PESolver::setIntegrationStartingValues(double *w, int j, int m)
 {
 	// set all to 0
 	memset(w, 0, (eightNp4_)*sizeof(double));
@@ -782,7 +781,7 @@ void PESolver::setIntegrationStartingValues(double *w, int j)
 	// set u[j] = 1.  Multiplication by 2 is due to {re,im}.
 	w[2*j] = 1.0;
 
-	gsl_complex uprime = gsl_complex_mul_imag(betaM_[j], secondRound ? 1 : -1);
+	gsl_complex uprime = gsl_complex_mul_imag(m == 1 ? beta1_[j] : betaM_[j], secondRound ? 1 : -1);
 	w[fourNp2_ + 2*j] = GSL_REAL(uprime);
 	w[fourNp2_ + 2*j+1] = GSL_IMAG(uprime);
 }
@@ -835,10 +834,13 @@ void PESolver::computeLayers()
 	// How many layers do we need?
 	double a = g_.height();
 
+	double magicNumber = 14;	// should be ln(1e15). However, emperically this is not enough to maintain stability (ex: REIXS LEG).  14 = ln(1e6) seems stable for all tests so far.
+
 	// How many layers to use? In order to keep size of exp(i betaM_{±N}) < 1e15 to avoid losing precision in double values compared with unity-size numbers.
-	numLayers_ = std::max( GSL_IMAG(betaM_[0])*a/log(1e15), GSL_IMAG(betaM_[2*N_])*a/log(1e15) );
+	numLayers_ = std::max( fabs(GSL_IMAG(betaM_[0]))*a/magicNumber, fabs(GSL_IMAG(betaM_[2*N_]))*a/magicNumber );
 	if(numLayers_ < 1)
 		numLayers_ = 1;	// we need at least one layer, in addition to the substrate.
+
 	M_ = numLayers_+2;
 
 	y_ = new double[M_];	// To be consistent with the text, we number the lowest layer as 1.  y_[0] is therefore unused, so that we can use y_m = y_[m], with lowest m=1, highest m=M-1.
@@ -867,14 +869,14 @@ PEResult::Code PESolver::computeTMatrixBelowLayer(int m, bool printDebugOutput)
 	bool integrationFailureOccurred = false;
 
 	// We now need 2*(2N+1) trial solutions.  j will be the loop index over p, but ranging from [0,4*N+1].
-#pragma omp parallel for num_threads(numThreads_)
+#pragma omp parallel for num_threads(numThreads_) schedule(static,1)
 	for(int j=0; j<fourNp2_; ++j) {
 
 		// Get a [u,uprime] vector to work with for this trial solution.
 		double* w = wVectorForP(j);
 
 		// set its initial values at y_[m-1]
-		setIntegrationStartingValues(w, j);
+		setIntegrationStartingValues(w, j, m-1);
 
 		////////////////////////////
 		if(printDebugOutput && omp_get_thread_num() == 0) {
