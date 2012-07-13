@@ -162,8 +162,11 @@ protected:
 	
 	/// A flag that indicates that we should measure the time required for all related blocks of operations
 	bool measureTiming_;
+
 	/// Stores the timing results:
-	double timing_[12];	
+	double timing_[12];
+	/// Used for calculating computation times.
+	double time_;
 };
 
 

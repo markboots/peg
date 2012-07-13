@@ -19,7 +19,7 @@ PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo, int numThr
 {
 	numThreads_ = numThreads;
 	measureTiming_ = measureTiming;
-	timing_[0] = omp_get_wtime();
+	time_ = omp_get_wtime();
 	
 	// set math options.
 	N_ = mo.N;
@@ -51,7 +51,7 @@ PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo, int numThr
 	for(int i=0; i<numThreads_; ++i)
 		k2_[i] = new gsl_complex[twoNp1_];
 	
-	timing_[1] = omp_get_wtime();
+	timing_[0] = omp_get_wtime() - time_;		// time to allocate memory.
 }
 
 
@@ -82,11 +82,12 @@ PESolver::~PESolver() {
 
 /// \todo Imp.
 PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput) {
+
+	time_ = omp_get_wtime();
 	
 	// 1. Setup incidence variables and constants
 	/////////////////////////////////////////
 	
-	timing_[2] = omp_get_wtime();
 	// Set this as the current wavelength
 	wl_ = wl;
 	// get material refractive index at wavelength
@@ -94,15 +95,22 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	if(GSL_REAL(v_1_) == 0.0 && GSL_IMAG(v_1_) == 0.0) {
 		return PEResult(PEResult::MissingRefractiveDataFailure);
 	}
+
+	timing_[1] = time_;
+	time_ = omp_get_wtime();
+	timing_[1] = time_ - timing_[1];	// time to look up refractive index.
 	
 	// 2. compute all alpha_n and beta1_n, betaM_n.
 	///////////////////////////////////
-	timing_[3] = omp_get_wtime();
 	
 	computeAlphaAndBeta(incidenceDeg);	// (This uses a parallel loop).
 
 	// Calculates how many vertical layers we need, and the division into slices at y_.
 	computeLayers();
+
+	timing_[2] = time_;
+	time_ = omp_get_wtime();
+	timing_[2] = time_ - timing_[2];	// time to calculate alpha, beta, and layers.
 
 	if(printDebugOutput) {
 		std::cout << "\nWavelength wl (um): " << wl_ << std::endl;
@@ -113,16 +121,12 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 		for(int m=1; m<M_; ++m) {
 			std::cout << "   y_" << m << " = " << y_[m] << std::endl;
 		}
-	}
-	
-	if(printDebugOutput) {
+
 		std::cout << "\nbeta1_n:" << std::endl;
 		for(int i=0; i<twoNp1_; ++i) {
 			std::cout << i - N_ << ":\t" << GSL_REAL(beta1_[i]) << "\t\t" << GSL_IMAG(beta1_[i]) << std::endl;
 		}
-	}
-	
-	if(printDebugOutput) {
+
 		std::cout << "\nbetaM_n:" << std::endl;
 		for(int i=0; i<twoNp1_; ++i) {
 			std::cout << i - N_ << ":\t" << GSL_REAL(betaM_[i]) << "\t\t" << GSL_IMAG(betaM_[i]) << std::endl;
@@ -132,8 +136,6 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	// 3. Recursive computation of S-matrix below each layer.
 	/////////////////////////////////////////////////////////////
 
-	timing_[4] = omp_get_wtime();
-
 	gsl_complex one = gsl_complex_rect(1,0);
 	gsl_complex zero = gsl_complex_rect(0,0);
 
@@ -141,6 +143,10 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	PEResult::Code status = computeTMatrixBelowLayer(2, printDebugOutput);
 	if(status != PEResult::Success)
 		return status;
+
+	timing_[3] = time_;
+	time_ = omp_get_wtime();
+	timing_[3] = time_ - timing_[3];	// timing_[3]: numerical integration.
 
 	// For the first layer, we have Zinv_ = T11_.
 	// S12_ = T21_ Zinv_^{-1}
@@ -157,11 +163,22 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	if(gsl_blas_zgemm(CblasNoTrans, CblasNoTrans, one, T21_, S22_, zero, S12_) != GSL_SUCCESS)
 		return PEResult(PEResult::AlgebraFailure);
 
+	timing_[4] = time_;
+	time_ = omp_get_wtime();
+	timing_[4] = time_ - timing_[4];	// timing_[4]: matrix calcs.
+
 
 	// First layer done. Handle subsequent layers
 	for(int m=3; m<M_; ++m) {
+
+		time_ = omp_get_wtime();
+
 		status = computeTMatrixBelowLayer(m, printDebugOutput);
 		if(status != PEResult::Success) return status;
+
+		timing_[3] += omp_get_wtime() - time_;
+
+		time_ = omp_get_wtime();
 
 		// Compute Zinv_ = T11_ + T12_ S12_.
 		gsl_matrix_complex_memcpy(Zinv_, T11_);
@@ -181,13 +198,19 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 		gsl_matrix_complex_memcpy(workMatrix_, S22_);
 		if(gsl_blas_zgemm(CblasNoTrans, CblasNoTrans, one, workMatrix_, Z_, zero, S22_) != GSL_SUCCESS)
 			return PEResult(PEResult::AlgebraFailure);
+
+		timing_[4] += omp_get_wtime() - time_;
 	}
 
 	// 4.  Calculate B_n^M from center column of S matrix * exp(...).
 	//////////////////////////////////////////////
-	timing_[5] = omp_get_wtime();
+	time_ = omp_get_wtime();
 
 	computeBMFromSMatrix();
+
+	timing_[5] = time_;
+	time_ = omp_get_wtime();
+	timing_[5] = time_ - timing_[5];	// timing_[5]: compute BM_ from S-matrix.
 
 	if(printDebugOutput) {
 		std::cout << "\nBM_:" << std::endl;
@@ -196,193 +219,8 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 		}
 	}
 
-
-
-
-	/*
-
-	// 3. set up trial solutions at y=0, and then integrate their ODEs from y=0 to y=a.
-	////////////////////////////////////////
-	timing_[4] = omp_get_wtime();
-
-	////////////////////////////////
-	//	if(printDebugOutput) {
-	//		std::cout << "Example grating expansion at y = 0.02" << std::endl;
-	//		gsl_complex* localK2 = k2ForCurrentThread();
-	//		computeGratingExpansion(0.01, localK2);
-
-	//		// wave number in free space: k_2 = v_2 * w / c.  v_2 = 1 in empty space, so k_2 = 2pi / wl.
-	//		gsl_complex k_2 = gsl_complex_rect(2 * M_PI / wl_, 0);
-	//		// wave number in the grating: k_1 = v_1 * w / c = v_1 * 2pi / wl = v_1 * k_2.
-	//		gsl_complex k_1 = gsl_complex_mul(v_1_, k_2);
-
-	//		// square them to get k^2_2 and k^2_1:
-	//		gsl_complex k2_2 = gsl_complex_mul(k_2, k_2);
-	//		gsl_complex k2_1 = gsl_complex_mul(k_1, k_1);
-
-	//		std::cout << "k2_2" << GSL_REAL(k2_2) << "," << GSL_IMAG(k2_2) << std::endl;
-	//		std::cout << "k2_1" << GSL_REAL(k2_1) << "," << GSL_IMAG(k2_1) << std::endl;
-
-	//		for(int i=0; i<twoNp1_; ++i) {
-	//			std::cout << "   " << GSL_REAL(localK2[i]) << "," << GSL_IMAG(localK2[i]);
-	//		}
-	//		std::cout << std::endl;
-	//	}
-	/////////////////////////////////
-
-	// Loop over all trial solutions p:  [row: n.  col: p]
-	// !! This is the time-consuming step, but all of the trial solutions are independent. Every loop iteration is independent, therefore we use an OpenMP parallel-for loop here. We might expect that the integration time will increase or decrease monotonically over p, so we use a cyclic partition for load-balancing. !!
-	bool integrationFailureOccurred = false;
-#pragma omp parallel for num_threads(numThreads_) schedule(static,1)
-	for(int i=0; i<twoNp1_; ++i) {
-		// int p = i - N_;
-
-		double* w = wVectorForP(i);
-
-		// insert initial values at y=yStart=0.  u(yStart) = 1* \delta_{np}.  u'(yStart) = -i * beta^(1)_n \delta_{np}
-		setIntegrationStartingValues(w, i);
-
-		////////////////////////////
-		if(printDebugOutput && omp_get_thread_num() == 0) {
-			std::cout << "Initial value u_{p=" << i-N_ << "}(0):" <<std::endl;
-			std::cout << "     ";
-			for(int n=0; n<twoNp1_; ++n)
-				std::cout << w[2*n] << "," << w[2*n+1] << "    ";
-			std::cout << std::endl;
-			std::cout << "Initial value u'_{p=" << i-N_ << "}(0):" <<std::endl;
-			std::cout << "     ";
-			for(int n=0; n<twoNp1_; ++n)
-				std::cout << w[fourNp2_ + 2*n] << "," << w[fourNp2_ + 2*n+1] << "    ";
-			std::cout << std::endl;
-			std::cout << std::endl;
-		}
-		//////////////////////////
-
-		// need to integrate u and uprime along y, using d^2 u/dy^2 = M(y) u
-		PEResult::Code err = integrateTrialSolutionAlongY(w, 0.0, g_.height());
-		if(err != PEResult::Success)
-			integrationFailureOccurred = true;	// We used to exit the loop here, but that is not allowed in an OpenMP parallel for.  Set this flag instead.  It is only written, but not read, by different threads, so we should be OK.
-
-		//////////////////////////
-		if(printDebugOutput && omp_get_thread_num() == 0) {
-			if(err == PEResult::Success) {
-				std::cout << "Final value u_{p=" << i-N_ << "}(0):" <<std::endl;
-				std::cout << "     ";
-				for(int n=0; n<twoNp1_; ++n)
-					std::cout << w[2*n] << "," << w[2*n+1] << "    ";
-				std::cout << std::endl;
-				std::cout << "Final value u'_{p=" << i-N_ << "}(0):" <<std::endl;
-				std::cout << "     ";
-				for(int n=0; n<twoNp1_; ++n)
-					std::cout << w[fourNp2_ + 2*n] << "," << w[fourNp2_ + 2*n+1] << "    ";
-				std::cout << std::endl;
-				std::cout << std::endl;
-			}
-			else
-				std::cout << "Integration Failure on p=" << i-N_ << std::endl;
-		}
-		/////////////////////////////
-	}
-	if(integrationFailureOccurred)
-		return PEResult(PEResult::ConvergenceFailure);
-
-	// Now we have u(a) and u'(a) in w.
-
-
-	// 4. Need to calculate the T matrix that maps the grating input to grating output (in the basis expansion)
-	//        T_np = (1/2)( u_np(a) - u'_np(a) / i beta2_n )
-	/////////////////////////////
-	timing_[5] = omp_get_wtime();
-
-	for(int i=0; i<twoNp1_; ++i) { // loop over rows (n)
-		z = gsl_complex_mul_imag(betaM_[i], 1.0);		// = i beta2_n
-		for(int j=0; j<twoNp1_; ++j) { // loop over cols (p)
-			gsl_matrix_complex_set(T_, i, j, gsl_complex_mul_real(gsl_complex_sub(*u(i,j), gsl_complex_div(*uprime(i,j), z)), 0.5));
-		}
-	}
-
-
-	//////////////////////////////////////
-	if(printDebugOutput) {
-
-		std::cout << "T matrix:" << std::endl;
-
-		for(int i=0; i<twoNp1_; ++i) {
-			for(int j=0; j<twoNp1_; ++j) {
-				gsl_complex z = gsl_matrix_complex_get(T_, i, j);
-				std::cout << GSL_REAL(z) << "+" << GSL_IMAG(z) << "i, ";
-			}
-			std::cout << ";" << std::endl;
-		}
-
-		std::cout << std::endl << std::endl;
-	}
-	//////////////////////////////////////
-
-	// 5. Set up the input (incidence) basis vector Vincident_
-	/////////////////////////////
-
-	// fill out the incidence matrix Vincident_: when n=0, Vincident_0 = A2_0*exp(-i*beta2_0*a)=exp(-i*beta2_0*a). For all other n, Vincident_ = 0.
-	z = gsl_complex_exp(gsl_complex_mul_imag(betaM_[N_], -a));
-	if(printDebugOutput) {
-		std::cout << "\nIncident vector component Vincident_0: " << GSL_REAL(z) << "," << GSL_IMAG(z) << std::endl;
-	}
-	gsl_vector_complex_set(Vincident_, N_, z);
-
-	// 6. Now we have a linear system:  T_ A1_ = Vincident_.   Solve for A1_, using standard LU decomposition.
-	///////////////////////////////
-
-	int s;
-	errCode = gsl_linalg_complex_LU_decomp(T_, permutation_, &s);
-	if(errCode) return PEResult(PEResult::AlgebraFailure);
-	errCode = gsl_linalg_complex_LU_solve(T_, permutation_, Vincident_, A1_);
-	if(errCode) return PEResult(PEResult::AlgebraFailure);
-
-	if(printDebugOutput) {
-		std::cout << "\nA1_:" << std::endl;
-		for(int i=0; i<twoNp1_; ++i) {
-			std::cout << i - N_ << ":\t" << GSL_REAL(gsl_vector_complex_get(A1_, i)) << "\t\t" << GSL_IMAG(gsl_vector_complex_get(A1_, i)) << std::endl;
-		}
-	}
-
-	// 7. Solve for the reflected Rayleigh coefficients B2_.
-	////////////////////////////////
-	timing_[6] = omp_get_wtime();
-
-	// Now we have A1_.  Need to get B2_.  From eqn. II.18, \sum_p { A^(1)_p u_{np}(a) } - A2_0 exp(-i beta2_0 a) \delta_{n,0} = B2_n exp(i beta2_n a)
-	for(int i=0; i<twoNp1_; ++i) {	// loop over orders n
-		// compute the sum: \sum_p { A^(1)_p u_{np}(a) }
-		gsl_complex sum = gsl_complex_rect(0,0);
-		for(int j=0; j<twoNp1_; ++j) {	// loop over trial solutions p
-			sum = gsl_complex_add(sum, gsl_complex_mul(gsl_vector_complex_get(A1_, j), *u(i,j)));
-		}
-		gsl_vector_complex_set(B2_, i, sum);
-	}
-
-	// now we need to subtract exp(-i beta2_0 a) when n = 0:
-	gsl_complex temp = gsl_complex_exp(gsl_complex_mul_imag(betaM_[N_], -a));
-	temp = gsl_complex_sub(gsl_vector_complex_get(B2_, N_), temp);
-	gsl_vector_complex_set(B2_, N_, temp);
-	// and then divide by exp(i beta2_n a) for all n.
-	for(int i=0; i<twoNp1_; ++i) {
-		temp = gsl_complex_exp(gsl_complex_mul_imag(betaM_[i], a));
-		temp = gsl_complex_div(gsl_vector_complex_get(B2_, i), temp);
-		gsl_vector_complex_set(B2_, i, temp);
-	}
-
-	if(printDebugOutput) {
-		std::cout << "\nB2_:" << std::endl;
-		for(int i=0; i<twoNp1_; ++i) {
-			std::cout << i - N_ << ":\t" << GSL_REAL(gsl_vector_complex_get(B2_, i)) << "\t\t" << GSL_IMAG(gsl_vector_complex_get(B2_, i)) << std::endl;
-		}
-	}
-	*/
-
-
 	// 8. Now we have BM_. Compute efficiency and put into result structure.
 	////////////////////////////////////////
-	
-	timing_[7] = omp_get_wtime();
 	
 	PEResult result(N_);
 	result.wavelength = wl_;
@@ -396,18 +234,21 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 		effSum += result.eff[i];
 	}
 	
-	timing_[8] = omp_get_wtime();
+	timing_[6] = time_;
+	time_ = omp_get_wtime();
+	timing_[6] = time_ - timing_[6];	// timing_[6]: calculate efficiencies from BM_
 	
 	if(measureTiming_) {
 		std::cout << "Timing Profile:" << std::endl;
-		std::cout << "   Allocate Memory: " << timing_[1] - timing_[0] << std::endl;
-		std::cout << "   Setup problem variables: " << timing_[3] - timing_[2] << std::endl;
-		std::cout << "   Compute alpha, beta2, and beta1 values: " << timing_[4] - timing_[3] << std::endl;
-		std::cout << "   Integrate all trial solutions: " << timing_[5] - timing_[4] << std::endl;
-		std::cout << "   Solve linear system for all An: " << timing_[6] - timing_[5] << std::endl;
-		std::cout << "   Compute all Bn: " << timing_[7] - timing_[6] << std::endl;
-		std::cout << "   Compute and package efficiencies: " << timing_[8] - timing_[7] << std::endl;
-		std::cout << "   Total (solver) time: " << timing_[8] - timing_[2] + timing_[1] - timing_[0] << std::endl << std::endl;
+		std::cout << "   Allocate Memory: " << timing_[0] << std::endl;
+		std::cout << "   Look up refractive index: " << timing_[1] << std::endl;
+		std::cout << "   Compute alpha, beta values and layers: " << timing_[2] << std::endl;
+		std::cout << "   Numerically integrating trial solutions: " << timing_[3] << std::endl;
+		std::cout << "   Matrix operations: " << timing_[4] << std::endl;
+		std::cout << "   Computing Rayleigh coeffients B_n: " << timing_[5] << std::endl;
+		std::cout << "   Compute and package efficiencies: " << timing_[6] << std::endl;
+		time_ = timing_[0] + timing_[1] + timing_[2] + timing_[3] + timing_[4] + timing_[5] + timing_[6];
+		std::cout << "   Total (solver) time: " << time_ << std::endl << std::endl;
 	}
 
 	if(printDebugOutput) {
