@@ -26,6 +26,7 @@ public:
 	int toOrder;
 
 	int N;
+	double integrationTolerance;
 
 	PEGrating::Profile profile;
 	double period;

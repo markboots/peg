@@ -51,15 +51,15 @@ std::ostream& operator<<(std::ostream& os, const PEResult& result);
 /// Represents the numerical options to be used for a single grating calculation.
 class PEMathOptions {
 public:
-	/// Fourier truncation index N. Should be a positive number.
+	/// Fourier truncation index N. Should be a positive number; Fourier components from [-N, N].
 	int N;
-	/// Number of integration steps along y
-	int niy;
+	/// Tolerance required (eps) in the numerical integration process at each step
+	double integrationTolerance;
 	
-	/// Constructor:
-	PEMathOptions(int FourierN = 15, int numberOfIntegrationSteps = 401) {
+	/// Constructor
+	PEMathOptions(int FourierN = 15, double IntegrationTolerance = 1e-5) {
 		N = FourierN;
-		niy = numberOfIntegrationSteps;
+		integrationTolerance = IntegrationTolerance;
 	}
 };
 

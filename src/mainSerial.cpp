@@ -1,23 +1,6 @@
 #include "PEG.h"
 #include "PEMainSupport.h"
 
-/*! \todo TODO LIST
-
-1. - For the following input, beta2_n is coming out weird (all imaginary, instead of all real) for the outside orders.
-
-./pegSerial --mode constantIncidence --min 100 --max 120 --increment 5 --incidenceAngle 88 --outputFile testOutput.txt --progressFile testProgress.txt --gratingType blazed --gratingPeriod 1 --printDebugOutput --gratingMaterial Au --N 15 --gratingGeometry 2.5,30 --eV
-
-Maybe because at this incidence, there are no outside orders? Just evanescent waves?
-
-
-2.  Implement refractive index lookups and database files.
-
-
-3. Fix broken numerical results.  How?!
-
-*/
-
-
 /// This main program provides a command-line interface to run a series of sequential grating efficiency calculations. The results are written to an output file, and (optionally) a second file is written to provide information on the status of the calculation.  [This file is only responsible for input processing and output; all numerical details are structured within PEGrating and PESolver.]
 /*! 
 <b>Command-line options</b>
@@ -75,13 +58,15 @@ Output:
 
 --measureTiming
 	If this flag is included, the solver will report the time required for each category of operations to standard output.
-	
+
+--integrationTolerance <tolerance>
+	If provided, specifies the error tolerance (eps) required at each step of the numerical integration process. Default if not provided is 1e-5.
 	
 <b>Output</b>
 
 An example of the output file written to --outputFile is shown below. If the file exists already, it will be overwritten.
 
-=========================
+\code
 # Input
 mode=constantIncidence
 incidenceAngle=88
@@ -94,6 +79,7 @@ gratingPeriod=1.6
 gratingGeometry=3.2,30.0
 gratingMaterial=Au
 N=5
+integrationTolerance=1e-5
 # Progress
 status=succeeded     (inProgress, someFailed, allFailed, succeeded)
 completedSteps=41
@@ -103,16 +89,18 @@ totalSteps=41
 105[tab]<e-5>,<e-4>,<e-3>,<e-2>,<e-1>,<e0>,<e1>,<e2>,<e3>,<e4>,<e5>
 110[tab]<e-5>,<e-4>,<e-3>,<e-2>,<e-1>,<e0>,<e1>,<e2>,<e3>,<e4>,<e5>
 ...
-=========================
+\endcode
 
 If a --progressFile is specified, it is written and re-written during the calculation, containing the # Progress section from the main output file:
 
-=========================
+
+\code
 # Progress
 status=inProgress
 completedSteps=3
 totalSteps=41
-=========================
+\endcode
+
 
 <b>Sample Input and Output</b>
 
@@ -137,6 +125,7 @@ gratingPeriod=1
 gratingGeometry=2.5,30
 gratingMaterial=Au
 N=15
+integrationTolerance=1e-5
 # Progress
 status=succeeded
 completedSteps=5
@@ -148,38 +137,6 @@ totalSteps=5
 115	1.33797e-08,1.59323e-09,3.72418e-08,1.49557e-07,3.76447e-07,7.69366e-07,1.42177e-06,3.03323e-06,3.41893e-06,5.4017e-06,8.37909e-06,1.32201e-05,2.21424e-05,4.28869e-05,0.000125008,1.02805,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 120	2.54404e-07,1.29081e-07,2.35166e-07,8.24594e-07,2.28514e-06,5.43443e-06,1.49531e-05,7.57429e-06,1.89261e-05,3.38267e-05,5.67474e-05,9.52516e-05,0.000168523,0.000344133,0.00106247,0.706105,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 \endcode
-
-
-Parallel command:
-
-\code
-mpiexec -n 4 ./pegMPI --mode constantIncidence --min 100 --max 120 --increment 5 --incidenceAngle 88 --outputFile testOutput.txt --progressFile testProgress.txt --gratingType blazed --gratingPeriod 1 --gratingMaterial Au --N 15 --gratingGeometry 2.5,30 --eV
-\endcode
-
-Output:
-
-# Input
-mode=constantIncidence
-incidenceAngle=88
-units=eV
-min=100
-max=120
-increment=5
-gratingType=blazed
-gratingPeriod=1
-gratingGeometry=2.5,30
-gratingMaterial=Au
-N=15
-# Progress
-status=succeeded
-completedSteps=5
-totalSteps=5
-# Output
-100	1.33437e-08,2.01772e-09,3.14758e-08,1.26258e-07,3.16875e-07,6.42301e-07,1.15956e-06,1.96424e-06,3.60516e-06,4.37926e-06,6.85693e-06,1.07995e-05,1.80188e-05,3.47459e-05,0.000100891,1.0115,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-105	3.10432e-07,1.55365e-07,2.82109e-07,9.94978e-07,2.7072e-06,6.06691e-06,1.24446e-05,2.89393e-05,1.56923e-05,3.91265e-05,6.86083e-05,0.000116368,0.000206277,0.000420725,0.00129465,0.667446,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-110	1.16288e-07,9.20616e-07,2.97772e-06,6.85694e-06,1.33289e-05,2.35907e-05,4.04132e-05,8.6704e-05,4.52472e-05,0.000100956,0.000160452,0.000247542,0.000404021,0.000767342,0.00219208,1.57674,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-115	1.33797e-08,1.59323e-09,3.72418e-08,1.49557e-07,3.76447e-07,7.69366e-07,1.42177e-06,3.03323e-06,3.41893e-06,5.4017e-06,8.37909e-06,1.32201e-05,2.21424e-05,4.28869e-05,0.000125008,1.02805,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-120	2.54404e-07,1.29081e-07,2.35166e-07,8.24594e-07,2.28514e-06,5.43443e-06,1.49531e-05,7.57429e-06,1.89261e-05,3.38267e-05,5.67474e-05,9.52516e-05,0.000168523,0.000344133,0.00106247,0.706105,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 
 */
 int main(int argc, char** argv) {
@@ -242,7 +199,7 @@ int main(int argc, char** argv) {
 	}
 	
 	// set math options: truncation index from input.
-	PEMathOptions mathOptions(io.N);
+	PEMathOptions mathOptions(io.N, io.integrationTolerance);
 	
 	// output data stored here:
 	bool anyFailures = false;

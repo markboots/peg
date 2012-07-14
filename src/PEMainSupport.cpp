@@ -15,6 +15,7 @@ void PECommandLineOptions::init() {
 	printDebugOutput = false;
 	threads = 1;	// by default, just one thread.
 	measureTiming = false;
+	integrationTolerance = 1e-5;	// default: 1e-5 if not provided.
 }
 
 // Sets options based on command-line input arguments. Returns isValid().
@@ -44,6 +45,7 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 				{"printDebugOutput", no_argument, 0, 17},
 				{"threads", required_argument, 0, 18},
 				{"measureTiming", no_argument, 0, 19},
+				{"integrationTolerance", required_argument, 0, 20},
 				{0, 0, 0, 0}
 			};
 				
@@ -153,6 +155,9 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 				break;
 			case 19: // measure timing
 				measureTiming = true;
+				break;
+			case 20: // integrationTolerance
+				integrationTolerance = atof(optarg);
 				break;
 			}
 		} // end of loop over input options.
@@ -272,6 +277,7 @@ void writeOutputFileHeader(std::ostream& of, const PECommandLineOptions& io) {
 	of << "gratingMaterial=" << io.material << std::endl;
 	
 	of << "N=" << io.N << std::endl;
+	of << "integrationTolerance=" << io.integrationTolerance << std::endl;
 }
 
 // This helper function appends the progress to the given output stream
