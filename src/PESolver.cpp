@@ -7,6 +7,7 @@
 #include <gsl/gsl_cblas.h>
 #include <gsl/gsl_blas.h>
 #include <omp.h>
+#include <string.h>
 
 // For debug output only:
 #include <iostream>
