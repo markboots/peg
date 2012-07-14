@@ -6,4 +6,4 @@ from subprocess import call
 
 @celery.task
 def runCalculation(argumentString):
-	return subprocess.call("./pegSerial " + argumentString)
+	return call("./pegSerial", argumentString.split())

@@ -6,7 +6,8 @@ celery = Celery(broker='amqp://',
                 backend='amqp://',
                 include=['pegCelery.tasks'])
 
-# Optional configuration, see the application user guide.
+# Configuration required to work with PHP-Celery
 celery.conf.update(
-    CELERY_TASK_RESULT_EXPIRES=3600,
+    CELERY_RESULT_SERIALIZER = "json",
+    CELERY_TASK_RESULT_EXPIRES = None
 )
