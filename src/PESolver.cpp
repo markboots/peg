@@ -7,6 +7,7 @@
 #include <gsl/gsl_cblas.h>
 #include <gsl/gsl_blas.h>
 #include <omp.h>
+#include <string.h>
 
 // For debug output only:
 #include <iostream>
@@ -50,7 +51,8 @@ PESolver::PESolver(const PEGrating& grating, const PEMathOptions& mo, int numThr
 	k2_ = new gsl_complex*[numThreads_];
 	for(int i=0; i<numThreads_; ++i)
 		k2_[i] = new gsl_complex[twoNp1_];
-	
+
+	y_ = 0;
 	timing_[0] = omp_get_wtime() - time_;		// time to allocate memory.
 }
 

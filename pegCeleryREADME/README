@@ -1,0 +1,69 @@
+# This folder provides a Python module to run pegSerial as a task in a Celery distributed work queue.
+
+# The Celery worker needs to be launched either directly:
+# [From inside root 'peg' directory]
+
+celery worker --app=pegCelery -l info
+
+# Or in the background:
+
+celery multi start w1 -A pegCelery -l info
+
+# Or as a daemon. Steps:
+# 1. pegCelery/celeryd to /etc/init.d/celeryd
+# 2. Copy pegCelery/exampleCelerydConfiguration to /etc/default/celeryd
+# 3. 
+
+# Once the Celery worker is running, you can submit tasks to the queue like this:
+>>> from pegCelery.tasks import runCalculation
+>>> runCalculation.delay("--mode constantIncidence --min 400 --max 436 --increment 1 --incidenceAngle 88 --outputFile testRect.txt --progressFile testRectProgress.txt --gratingType rectangular --gratingPeriod 1 --gratingMaterial Pt --N 15 --gratingGeometry 0.02,0.5 --eV --threads 2 --printDebugOutput")
+
+# Or from PHP like this:
+
+$c = new Celery('localhost', 'guest', '', '/');
+
+$argumentString = '--mode constantIncidence --min 434 --max 436 --increment 1 --incidenceAngle 88 --outputFile testRect.txt --progressFile testRectProgress.txt --gratingType rectangular --gratingPeriod 1 --gratingMaterial Pt --N 15 --gratingGeometry 0.02,0.5 --eV --threads 2';
+
+$result = $c->PostTask('tasks.runCalculation', $argumentString);
+
+# Installing:
+######################
+
+# References:
+	# Installing rabbitmq-server: http://www.rabbitmq.com/install-debian.html
+	# Installing rabbitmq-c client: https://github.com/alanxz/rabbitmq-c (Run examples to check!)
+	# Installing PECL AMQP extension for PHP: http://ca3.php.net/manual/en/amqp.installation.php
+	# Getting php-celery file: https://github.com/gjedeer/celery-php
+	
+# FIRST: Install rabbitmq-server, but make sure to get a version that's at least 2.x.  Default for Ubuntu 10.04 is 1.7.2... But this will cause this problem: http://lists.rabbitmq.com/pipermail/rabbitmq-discuss/2010-December/010287.html  When used with the PECL AMQP extension, will cause PHP scripts to abort mysteriously with no feedback.  Can follow these instructions to get the most recent APT repository if your distribution has an old version:
+http://www.rabbitmq.com/install-debian.html
+
+sudo apt-get install rabbitmq-server
+
+# Install any missing Python dependencies:
+sudo apt-get install python-dev python-pip
+
+# Install the Python side of Celery on the worker machines:
+pip install celery
+
+# Install the PHP extension of Celery on the dispatch machine: requires AMQP extension and the rabbitmq-c client.
+# Getting rabbitmq-c client:
+git clone git://github.com/alanxz/rabbitmq-c.git
+cd rabbitmq-c
+git submodule init
+git submodule update
+sudo apt-get install autoconf libtool
+autoreconf -i
+./configure
+make
+sudo make install
+
+# Getting AMQP PHP (PECL) extension
+sudo apt-get install php5-dev
+sudo pecl install amqp
+# Modify /etc/php5/apache2/php.ini with "extension=amqp.so"
+
+# Getting PHP client library:
+git clone git://github.com/gjedeer/celery-php.git
+
+# copy celery.php wherever 'require'd.

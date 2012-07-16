@@ -1,4 +1,6 @@
 #include "PEMainSupport.h"
+#include <stdlib.h>
+#include <string.h>
 
 void PECommandLineOptions::init() {
 	mode = InvalidMode;

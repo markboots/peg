@@ -6,6 +6,7 @@
 #include <fstream>
 #include <algorithm>
 #include <vector>
+#include <string.h>
 
 // This packs the current result into a plain double \c array, for easy communication using standard MPI types.  The array must have pre-allocated room for 2N+1 + 4 elements.
 void PEResult::toDoubleArray(double* array) const {
