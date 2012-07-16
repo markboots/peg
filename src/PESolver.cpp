@@ -342,39 +342,49 @@ PEResult::Code PESolver::computeGratingExpansion(double y, gsl_complex* k2) cons
 	gsl_complex k_1 = gsl_complex_mul(v_1_, k_2);
 	
 	// square them to get k^2_2 and k^2_1:
-	gsl_complex k2_2 = gsl_complex_mul(k_2, k_2);
-	gsl_complex k2_1 = gsl_complex_mul(k_1, k_1);
+	gsl_complex stepsK2[2];
+	stepsK2[0] = gsl_complex_mul(k_2, k_2);
+	stepsK2[1] = gsl_complex_mul(k_1, k_1);
+
+	double stepsX[2];
+	stepsX[0] = x1;
+	stepsX[1] = x2;
+
+	computeGratingExpansion(stepsX, stepsK2, 2, k2);
+
+//	gsl_complex k2_2 = gsl_complex_mul(k_2, k_2);
+//	gsl_complex k2_1 = gsl_complex_mul(k_1, k_1);
 	
 	
-	// sigma1 (s1) and sigma2 (s2) are defined as: s_p = k^2_(p+1) - k^2_p... Except at p = P (max): s_P = k^2_1 - k^2_P.  We only have two crossings, so P = 2.  p = [1,2].
-	// k^2_p is the refractive index value on the left side of x_p crossing.
-	gsl_complex s1 = gsl_complex_sub(k2_1, k2_2);
-	gsl_complex s2 = gsl_complex_sub(k2_2, k2_1);
+//	// sigma1 (s1) and sigma2 (s2) are defined as: s_p = k^2_(p+1) - k^2_p... Except at p = P (max): s_P = k^2_1 - k^2_P.  We only have two crossings, so P = 2.  p = [1,2].
+//	// k^2_p is the refractive index value on the left side of x_p crossing.
+//	gsl_complex s1 = gsl_complex_sub(k2_1, k2_2);
+//	gsl_complex s2 = gsl_complex_sub(k2_2, k2_1);
 	
-	// for shorter calculations, define K as the grating number, 2*pi/d.  We just calculate it once.
-	double K = 2*M_PI/d;
+//	// for shorter calculations, define K as the grating number, 2*pi/d.  We just calculate it once.
+//	double K = 2*M_PI/d;
 	
-	// loop over all values of n, from -N to N.  See paper notes for formula for k^2_n [Page 5,6]
-	for(int i=0; i<twoNp1_; ++i) {
-		int n = i - N_;
+//	// loop over all values of n, from -N to N.  See paper notes for formula for k^2_n [Page 5,6]
+//	for(int i=0; i<twoNp1_; ++i) {
+//		int n = i - N_;
 		
-		if(n == 0) {
-			gsl_complex kk = gsl_complex_mul_real(k2_2, d);
-			kk = gsl_complex_sub(kk, gsl_complex_mul_real(s1, x1));
-			kk = gsl_complex_sub(kk, gsl_complex_mul_real(s2, x2));
+//		if(n == 0) {
+//			gsl_complex kk = gsl_complex_mul_real(k2_2, d);
+//			kk = gsl_complex_sub(kk, gsl_complex_mul_real(s1, x1));
+//			kk = gsl_complex_sub(kk, gsl_complex_mul_real(s2, x2));
 			
-			kk = gsl_complex_mul_real(kk, 1.0/d);
-			k2[i] = kk;
-		}
-		else {
-			double t1 = n*K*x1, t2 = n*K*x2;
-			gsl_complex kk = gsl_complex_mul(s1, gsl_complex_rect(sin(t1), cos(t1)));
-			kk = gsl_complex_add(kk, gsl_complex_mul(s2, gsl_complex_rect(sin(t2), cos(t2))));
+//			kk = gsl_complex_mul_real(kk, 1.0/d);
+//			k2[i] = kk;
+//		}
+//		else {
+//			double t1 = n*K*x1, t2 = n*K*x2;
+//			gsl_complex kk = gsl_complex_mul(s1, gsl_complex_rect(sin(t1), cos(t1)));
+//			kk = gsl_complex_add(kk, gsl_complex_mul(s2, gsl_complex_rect(sin(t2), cos(t2))));
 			
-			kk = gsl_complex_mul_real(kk, -1.0/2/M_PI/n);
-			k2[i] = kk;
-		}
-	}
+//			kk = gsl_complex_mul_real(kk, -1.0/2/M_PI/n);
+//			k2[i] = kk;
+//		}
+//	}
 	
 	return PEResult::Success;
 }
@@ -795,5 +805,43 @@ PEResult::Code PESolver::computeTMatrixBelowLayer(int m, bool printDebugOutput)
 		return PEResult::ConvergenceFailure;
 	else
 		return PEResult::Success;
+}
+
+// computes the fourier expansion of the multistep function given by values stepsK2 at x-axis locations stepsX, and stores in k2.
+void PESolver::computeGratingExpansion(const double *stepsX, const gsl_complex *stepsK2, int numSteps, gsl_complex *k2) const
+{
+	// period:
+	double d = g_.period();
+	double K = 2*M_PI/d;
+
+	/// \warning assumes numSteps is in (0, PEG_MAX_PROFILE_CROSSINGS]
+
+	// compute sigma values at crossings:
+	// sigma[p] = stepsK2[p+1] - stepsK2[p] for p<numSteps-1; sigma[numSteps-1]=sigma[0]-sigma[numSteps-1]
+	gsl_complex sigma[PEG_MAX_PROFILE_CROSSINGS];
+	for(int p=0;p<numSteps-1; ++p)
+		sigma[p] = gsl_complex_sub(stepsK2[p+1], stepsK2[p]);
+	sigma[numSteps-1] = gsl_complex_sub(stepsK2[0], stepsK2[numSteps-1]);
+
+	// loop over fourier indexes
+	for(int i=0; i<twoNp1_; ++i) {
+		int n = i - N_;
+
+		if(n == 0) {
+			gsl_complex f0 = gsl_complex_mul_real(stepsK2[0], d);
+			for(int p=0; p<numSteps; ++p)
+				f0 = gsl_complex_sub(f0, gsl_complex_mul_real(sigma[p], stepsX[p]));
+			k2[i] = gsl_complex_div_real(f0, d);
+		}
+
+		else {
+			gsl_complex fn = gsl_complex_rect(0,0);
+			for(int p=0; p<numSteps; ++p) {
+				double nKx = n*K*stepsX[p];
+				fn = gsl_complex_add(fn, gsl_complex_mul(sigma[p], gsl_complex_rect(sin(nKx), cos(nKx))));
+			}
+			k2[i] = gsl_complex_div_real(fn, -2*M_PI*n);
+		}
+	}
 }
 

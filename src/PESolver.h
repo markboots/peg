@@ -38,8 +38,13 @@ public:
 	/// Computes the blocks of the T matrix (T11_, T12_, T21_, T22_) for the layer below \c y_[m].  Since \c m = 1 is the top of the substrate, \c m can range from [2, M-1].
 	PEResult::Code computeTMatrixBelowLayer(int m, bool printDebugOutput = false);
 
-	/// Calculates the grating fourier expansion for k^2 at a given \c y value and wavelength \c wl, and stores in \c k2.  \c k2 must have space for 4*N_ + 1 coefficients, since we will be computing from n = -2N_ to 2N.   Reads member variables N_, wavelength wl_, grating refractive index \c v_1_, and grating geometry from \c g_.  Returns PEResult::Success, or PEResult::InvalidGratingFailure if the profile is not supported or \c y is larger than the groove height.
+	/// Calculates the grating fourier expansion for k^2_m at a given \c y value and wavelength \c wl, and stores in \c k2.  \c k2 must have space for 4*N_ + 1 coefficients, since we will be computing from n = -2N_ to 2N.   Reads member variables N_, wavelength wl_, grating refractive index \c v_1_, and grating geometry from \c g_.  Returns PEResult::Success, or PEResult::InvalidGratingFailure if the profile is not supported or \c y is larger than the groove height.
 	PEResult::Code computeGratingExpansion(double y, gsl_complex* k2) const;
+
+#define PEG_MAX_PROFILE_CROSSINGS 60
+
+	/// Computes the Fourier components of the grating expansion k^2_m into \c k2, based on an array of x crossing (step) values \c stepsX and corresponding k^2 values \c stepsK2 immediately to the left of those x values. \c numSteps is the number of steps [usually two or four, if there are interpenetrating coatings)].  Valid only up to PEG_MAX_PROFILE_CROSSINGS (60) to avoid allocating memory, since this function is called repeatedly.
+	void computeGratingExpansion(const double* stepsX, const gsl_complex* stepsK2, int numSteps, gsl_complex* k2) const;
 
 	/// Initializes an 8N+4 array of double [\c u, \c uprime] to contain the starting integration values of the electric field Fourier components. The first half of the array \c w contains \c u, the second half contains \c uprime, with each entry in {re,im} order.  The u value is set to $\delta_{n,p}$ and the u' value is set to $-i \beta_n^{(M)} \delta_{n,p}$ or $i \beta_n^{(M)} \delta_{n,p}$, depending on whether p > 2N_.  (Note n,p here are using numbering from 0, and that for the delta functions, p is aliased back onto [0, 2N] once it reaches 2N_+1.
 	/*! If layer \c m = 1, then uses beta1_n instead of betaM_n for the derivative. */
