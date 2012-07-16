@@ -50,7 +50,7 @@ public:
 
 	/// Integrates the electric field Fourier component vectors contained in \c w from y = \c yStart to y = \c yEnd, using the differential equation and ______ method.  Array \c w should contain vector \c u followed by \c uprime, with each entry in {re,im} order. Calls computeGratingExpansion() at each y value, so reads member variables N_, v_1_, and g_.  Modifies k2 (for thread) at each step.  Results are returned in-place.
 	PEResult::Code integrateTrialSolutionAlongY(double* w, double yStart, double yEnd);
-	/// This is an overloaded function. Integrates the electric field Fourier component vectors \c u and \c uprime from y=0 to y=a, using the differential equation and ______ method.  Calls computeGratingExpansion() at each y value, so reads member variables N_, v_1_, and g_.  Modifies k2 (for thread) at each step.  Results are returned in-place.
+	/// DEPRECATED. This is an overloaded function. Integrates the electric field Fourier component vectors \c u and \c uprime from y=0 to y=a, using the differential equation and ______ method.  Calls computeGratingExpansion() at each y value, so reads member variables N_, v_1_, and g_.  Modifies k2 (for thread) at each step.  Results are returned in-place.
 	PEResult::Code integrateTrialSolutionAlongY(gsl_vector_complex* u, gsl_vector_complex* uprime, double yStart, double yEnd);
 
 	/// The function callback for the integration process.  Must be static so we have an address for it, so \c peSolver will be a pointer to a solver (this).

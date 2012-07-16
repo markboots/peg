@@ -132,7 +132,7 @@ public:
 
 	The base class implementation handles simple profile shapes (those with a single local maximum), with or without an interpenetrating or thick coating. For this to work, the subclass must implement xIntersection1() and xIntersection2().
 	*/
-	virtual int computeK2StepsAtY(gsl_complex k2_vaccuum, gsl_complex k2_substrate, gsl_complex k2_coating, double* stepsX, double* stepsK2);
+	virtual int computeK2StepsAtY(double y, gsl_complex k2_vaccuum, gsl_complex k2_substrate, gsl_complex k2_coating, double* stepsX, gsl_complex* stepsK2) const;
 
 
 	// Computational Geometry. The following geometry functions describe the basic, bare profile, assuming there is no coating.
@@ -144,13 +144,19 @@ public:
 	/// Returns the x-coordinate of the first intersection with the bump [i.e., entering the material], at height \c y (assuming no coating).
 	/*! This is used by computeK2StepsAtY() for simple bump shapes with a single maximum; if re-implementing computeK2StepsAtY(), you can omit this.
 
-	\c y will range from 0 to profileHeight(). */
-	virtual double xIntersection1() const { return 0.; }
+	\c y will range from 0 to profileHeight().
+
+	Base class returns negative number to indicate geometry failure; must re-implement.
+*/
+	virtual double xIntersection1(double y) const { (void)y; return -1; }
 	/// Returns the x-coordinate of the second intersection with the bump [i.e., leaving the material], at height \c y (assuming no coating).
 	/*! This is used by computeK2StepsAtY() for simple bump shapes with a single maximum; if re-implementing computeK2StepsAtY(), you can omit this.
 
-	\c y will range from 0 to profileHeight(). */
-	virtual double xIntersection2() const { return 0.; }
+	\c y will range from 0 to profileHeight().
+
+	Base class returns negative number to indicate geometry failure; must re-implement.
+*/
+	virtual double xIntersection2(double y) const { (void)y; return -1; }
 
 	////////////////////////////
 	
@@ -186,6 +192,11 @@ public:
 
 	/// geo_[0] is the height, directly.
 	virtual double profileHeight() const { return geo(0); }
+
+	/// Returns the x-coordinate of the first intersection with the surface at \c y. Simple, because the grating doesn't change with height.
+	virtual double xIntersection1(double y) const { (void)y; return geo(1); }
+	/// Returns the x-coordinate of the second intersection with the surface at \c y. Simple, because the grating doesn't change with height.
+	virtual double xIntersection2(double y) const { (void)y; return period(); }
 };
 
 /// Blazed grating subclass
@@ -204,6 +215,11 @@ public:
 
 	/// geo(0) is blaze, geo(1) is anti-blaze angle, both in degrees.
 	virtual double profileHeight() const { return period() / (1/tan(geo(0)*M_PI/180) + 1/tan(geo(1)*M_PI/180)); }
+
+	/// Returns the x-coordinate of the first intersection with the surface at \c y.
+	virtual double xIntersection1(double y) const { return y / tan(geo(0)*M_PI/180.0); }
+	/// Returns the x-coordinate of the second intersection with the surface at \c y.
+	virtual double xIntersection2(double y) const { return period() - y / tan(geo(1)*M_PI/180.0); }
 };
 
 /// Sinusoidal grating subclass
@@ -221,6 +237,16 @@ public:
 
 	/// geo(0) is the depth, aka height.
 	virtual double profileHeight() const { return geo(0); }
+
+
+	/// Returns the x-coordinate of the first intersection with the surface at \c y.
+	/*! For sine profile, the surface is described by y = g(x) = depth/2 * ( 1 - cos(2pi x/d) ).
+  // geo(0) is the depth.
+
+	This returns inverse of grating profile formula above; will always return x in first half of period.*/
+	virtual double xIntersection1(double y) const { return geo(0)/2/M_PI * acos(1 - 2*y/geo(0)); }
+	/// Returns the x-coordinate of the second intersection with the surface at \c y. Due to symmetry, x2 = period() - x1().
+	virtual double xIntersection2(double y) const { return period() - xIntersection1(y); }
 };
 
 /// Trapezoidal grating subclass
@@ -241,6 +267,11 @@ public:
 
 	/// geo(0) is the depth, aka height.
 	virtual double profileHeight() const { return geo(0); }
+
+	/// Returns the x-coordinate of the first intersection with the surface at \c y. \todo Not yet implemented!
+	virtual double xIntersection1(double y) const { (void)y; return -1; }
+	/// Returns the x-coordinate of the second intersection with the surface at \c y. \todo Not yet implemented!
+	virtual double xIntersection2(double y) const { (void)y; return -1; }
 };
 
 #endif

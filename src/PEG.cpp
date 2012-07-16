@@ -3,6 +3,7 @@
 
 #include <gsl/gsl_complex_math.h>
 #include <fstream>
+#include <iostream>
 #include <algorithm>
 #include <vector>
 #include <string.h>
@@ -155,7 +156,37 @@ std::ostream& operator<<(std::ostream& os, const PEResult& result) {
 	return os;
 }
 
-int PEGrating::computeK2StepsAtY(gsl_complex k2_vaccuum, gsl_complex k2_substrate, gsl_complex k2_coating, double *stepsX, double *stepsK2)
+int PEGrating::computeK2StepsAtY(double y, gsl_complex k2_vaccuum, gsl_complex k2_substrate, gsl_complex k2_coating, double *stepsX, gsl_complex *stepsK2) const
 {
-	return -1;/// \todo
+	double x1 = xIntersection1(y);
+	double x2 = xIntersection2(y);
+	double d = period();
+
+	// Validity checks:
+	////////////////////////////
+	if(x1 < 0 || x2 < 0) {	// explicitly signals invalid geometry.
+		std::cout << "Grating Expansion: Error: Invalid Geometry." << std::endl;
+		return -1;	// invalid geometry.
+	}
+	if(x1 > d || x2 > d) {
+		std::cout << "Grating Expansion: Error: Intersections are wider than period " << d << std::endl;
+		return -1;	// invalid geometry.
+	}
+
+	// Sometimes x2 might drop below x1 if they're very close, and the integration routine goes slightly past the top of the grating. Let this slide.
+	if(x2 < x1 - 1e-10) {
+		std::cout << "Grating Expansion: Error: x2 is less than x1 by " << x1-x2 << std::endl;
+		return -1;	// above the grating.
+	}
+	if(x2 < x1)
+		x2 = x1;
+	//////////////////////////////
+
+	stepsX[0] = x1;
+	stepsK2[0] = k2_vaccuum;
+
+	stepsX[1] = x2;
+	stepsK2[1] = k2_substrate;
+
+	return 2;
 }
