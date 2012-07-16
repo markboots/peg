@@ -93,7 +93,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	// Set this as the current wavelength
 	wl_ = wl;
 	// get material refractive index at wavelength
-	v_1_ = g_.refractiveIndex(wl_);
+	v_1_ = g_.substrateRefractiveIndex(wl_);
 	if(GSL_REAL(v_1_) == 0.0 && GSL_IMAG(v_1_) == 0.0) {
 		return PEResult(PEResult::MissingRefractiveDataFailure);
 	}
@@ -117,7 +117,7 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	if(printDebugOutput) {
 		std::cout << "\nWavelength wl (um): " << wl_ << std::endl;
 		std::cout << "Refractive index: " << GSL_REAL(v_1_) << ", " << GSL_IMAG(v_1_) << std::endl;
-		std::cout << "Grating height a (um): " << g_.height() << std::endl;
+		std::cout << "Grating height a (um): " << g_.totalHeight() << std::endl;
 		std::cout << "Grating period (um): " << g_.period() << std::endl;
 		std::cout << "Number of layers: " << numLayers_ << std::endl;
 		for(int m=1; m<M_; ++m) {
@@ -685,7 +685,7 @@ void PESolver::computeAlphaAndBeta(double incidenceDeg)
 void PESolver::computeLayers()
 {
 	// How many layers do we need?
-	double a = g_.height();
+	double a = g_.totalHeight();
 
 	double magicNumber = 7;	// should be ln(1e15). However, emperically this is not enough to maintain stability (ex: REIXS LEG).  7 = ln(1e3) seems stable for all tests so far.
 
@@ -705,7 +705,7 @@ void PESolver::computeLayers()
 
 void PESolver::computeBMFromSMatrix()
 {
-	double a = g_.height();
+	double a = g_.totalHeight();
 
 #pragma omp parallel for num_threads(numThreads_)
 	for(int i=0; i<twoNp1_; i++) {

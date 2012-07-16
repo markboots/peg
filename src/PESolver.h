@@ -41,8 +41,6 @@ public:
 	/// Calculates the grating fourier expansion for k^2_m at a given \c y value and wavelength \c wl, and stores in \c k2.  \c k2 must have space for 4*N_ + 1 coefficients, since we will be computing from n = -2N_ to 2N.   Reads member variables N_, wavelength wl_, grating refractive index \c v_1_, and grating geometry from \c g_.  Returns PEResult::Success, or PEResult::InvalidGratingFailure if the profile is not supported or \c y is larger than the groove height.
 	PEResult::Code computeGratingExpansion(double y, gsl_complex* k2) const;
 
-#define PEG_MAX_PROFILE_CROSSINGS 60
-
 	/// Computes the Fourier components of the grating expansion k^2_m into \c k2, based on an array of x crossing (step) values \c stepsX and corresponding k^2 values \c stepsK2 immediately to the left of those x values. \c numSteps is the number of steps [usually two or four, if there are interpenetrating coatings)].  Valid only up to PEG_MAX_PROFILE_CROSSINGS (60) to avoid allocating memory, since this function is called repeatedly.
 	void computeGratingExpansion(const double* stepsX, const gsl_complex* stepsK2, int numSteps, gsl_complex* k2) const;
 

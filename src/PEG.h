@@ -7,12 +7,16 @@
 #include <string>
 #include <vector>
 #include <ostream>
+#include <math.h>
 
-// h*c (Planck constant * speed of light), in eV * um.  Used in conversion from eV to um.
+/// h*c (Planck constant * speed of light), in eV * um.  Used in conversion from eV to um.
 #define M_HC 1.23984172
 
-// Path to materials database (folder)
+/// Path to materials database (folder)
 #define PEG_MATERIALS_DB_PATH "materialDatabase"
+
+/// Maximum supported number of interfaces crossed in a horizontal slice through the grating; determines the size of arrays in computeK2StepsAtY().
+#define PEG_MAX_PROFILE_CROSSINGS 60
 
 // Common definitions for the PEG parallel grating efficiency library
 
@@ -64,7 +68,7 @@ public:
 };
 
 
-/// Represents the parameters for a grating
+/// Represents the parameters and geometry of a grating. Subclassed as required for different profiles.
 class PEGrating {
 public:
 	
@@ -75,7 +79,9 @@ public:
 	PEGrating() {
 		profile_ = InvalidProfile;
 		period_ = 1.0;
-		material_ = "Au";
+		substrateMaterial_ = "SiO2";
+		coatingMaterial_ = "Au";
+		coatingThickness_ = 0.;
 	}
 	
 	virtual ~PEGrating() {}
@@ -89,19 +95,64 @@ public:
 	double period() const { return period_; }
 	/// Returns profile-dependent geometry parameters
 	double geo(int parameterIndex) const { return geo_[parameterIndex]; }
-	/// Returns the height from the bottom of the grooves to the top of the grooves.  Profile-dependent, but the base class implementation handles the default rectangular, blazed, sinusoidal, and trapezoidal.
-	virtual double height() const;
+	/// Returns the height from the substrate surface (y=0) to the highest feature. If the grating has a coating, this should include the coating.
+	/*! This is shape-dependent, but the base class implementation handles the default rectangular, blazed, sinusoidal, and trapezoidal profiles. Re-implement for custom profiles.*/
+	virtual double totalHeight() const { return profileHeight() + coatingThickness_; }
+
+	/// Returns the substrate material code (ex: "Ni", "Au", etc.)
+	std::string substrateMaterial() const { return substrateMaterial_; }
+	/// Returns the coating material code (ex: "Ni", "Au", etc.)
+	std::string coatingMaterial() const { return coatingMaterial_; }
 	
-	/// Returns the grating material code (ex: "Ni", "Au", etc.)
-	std::string material() const { return material_; }
-	
-	
-	/// Returns the complex refractive index at a given wavelength \c wl in um.  Returns gsl_complex_rect(0,0) if the grating's material database was not found.
-	gsl_complex refractiveIndex(double wl) const;
+	/// Returns the complex refractive index of the substrate at a given wavelength \c wl in um.  Returns gsl_complex_rect(0,0) if the substrate material's database was not found.
+	gsl_complex substrateRefractiveIndex(double wl) const { return refractiveIndex(wl, substrateMaterial_); }
+	/// Returns the complex refractive index of the coating at a given wavelength \c wl in um.  Returns gsl_complex_rect(0,0) if the coating material's database was not found.
+	gsl_complex coatingRefractiveIndex(double wl) const { return refractiveIndex(wl, coatingMaterial_); }
+
+	/// Looks up the complex refractive index of \c material at a given wavelength \c wl in um.  Returns gsl_complex_rect(0,0) if the  material's database was not found.
+	static gsl_complex refractiveIndex(double wl, const std::string& material);
+
 	
 	
 	/// Calculates the grating efficiency at a given incidence angle \c incidenceDeg (degrees) and wavelength \c wl (um). \c numThreads is the number of threads to use for fine parallelization; ideally it should be <= the number of processor cores on your computer / on a single cluster node.
 	PEResult getEff(double incidenceDeg, double wl, const PEMathOptions& mo = PEMathOptions(), bool printDebugOutput = false, int numThreads = 1, bool measureTiming = false) const;
+
+
+	// Detailed geometry
+	/////////////////////////
+
+	/// Specific to each grating shape, this computes the values of the multistep function of the impedence k^2 at a height \c y, where \c y can be from [0, totalHeight()].  (This is the step function created by slicing horizontally through the structure.) Going from x = 0 to x = period(), every intersection with a new medium should result in an x-coordinate stored in \c stepsX, and the k^2 value at (x - eps, y) stored in stepsK2. This function should write values into \c stepsX, \c stepsY, and return the number of steps.  Return -1 to indicate an error (invalid geometry).
+	/*!
+	- For simple profiles with no coating, there are usually 2 steps: entering the material, and leaving the material.
+	- Coated gratings may have 4 steps at certain y values, if the are <i>interpenetrating</i>, i.e., the coating is thinner than the uncoated profileHeight().
+	- Profiles with multiple local maxima could have more steps at some \c y values, from entering and exiting the material multiple times.
+	- Within a homogeneous layer, there is only "one" step, with \c stepsX[0] = 0, \c stepsK2[0] = <the layer impedance>.
+
+	This function is called at each integration step, so we avoid dynamic memory for performance here. Note that \c stepsX and \c stepsK2 only have storage for a maximum of PEG_MAX_PROFILE_CROSSINGS.
+
+	The base class implementation handles simple profile shapes (those with a single local maximum), with or without an interpenetrating or thick coating. For this to work, the subclass must implement xIntersection1() and xIntersection2().
+	*/
+	virtual int computeK2StepsAtY(gsl_complex k2_vaccuum, gsl_complex k2_substrate, gsl_complex k2_coating, double* stepsX, double* stepsK2);
+
+
+	// Computational Geometry. The following geometry functions describe the basic, bare profile, assuming there is no coating.
+	////////////////
+
+	/// Returns the height of the bare bump, ignoring any coating that might exist.
+	/*! This is shape-dependent, but the base class implementation handles the default rectangular, blazed, sinusoidal, and trapezoidal profiles. Re-implement for custom profiles.*/
+	virtual double profileHeight() const { return 0.; }
+	/// Returns the x-coordinate of the first intersection with the bump [i.e., entering the material], at height \c y (assuming no coating).
+	/*! This is used by computeK2StepsAtY() for simple bump shapes with a single maximum; if re-implementing computeK2StepsAtY(), you can omit this.
+
+	\c y will range from 0 to profileHeight(). */
+	virtual double xIntersection1() const { return 0.; }
+	/// Returns the x-coordinate of the second intersection with the bump [i.e., leaving the material], at height \c y (assuming no coating).
+	/*! This is used by computeK2StepsAtY() for simple bump shapes with a single maximum; if re-implementing computeK2StepsAtY(), you can omit this.
+
+	\c y will range from 0 to profileHeight(). */
+	virtual double xIntersection2() const { return 0.; }
+
+	////////////////////////////
 	
 	
 protected:
@@ -111,62 +162,85 @@ protected:
 	double period_;
 	/// General geometry parameters. Interpretation depends on profile.
 	double geo_[8];
-	/// Grating material
-	std::string material_;
-	
+	/// Substrate material
+	std::string substrateMaterial_;
+	/// Coating material
+	std::string coatingMaterial_;
+	/// The thickness of the coating (um), or 0 for no coating.
+	double coatingThickness_;
 };
 
 /// Rectangular grating subclass
 class PERectangularGrating : public PEGrating {
 public:
 	/// Constructs a grating with a rectangular profile. The required geometry parameters are the groove \c height in um, and the \c valleyWidth in um.  The \c valleyWidth is the width of the low part of the groove, and must obviously be less than the period.
-	PERectangularGrating(double period = 1.0, double height = 0.05, double valleyWidth = 0.5, const std::string& material = "Au") {
+	PERectangularGrating(double period = 1.0, double height = 0.05, double valleyWidth = 0.5, const std::string& material = "Au", const std::string& coating = "Au", double coatingThickness = 0) {
 		profile_ = RectangularProfile;
 		period_ = period;
 		geo_[0] = height;
 		geo_[1] = valleyWidth;
-		material_ = material;
+		substrateMaterial_ = material;
+		coatingMaterial_ = coating;
+		coatingThickness_ = coatingThickness;
 	}
+
+	/// geo_[0] is the height, directly.
+	virtual double profileHeight() const { return geo(0); }
 };
 
 /// Blazed grating subclass
 class PEBlazedGrating : public PEGrating {
 public:
 	/// Constructs a grating with the blazed profile. The required geometry parameters are the blaze angle \c blazeAngleDeg, in deg., and the anti-blaze angle \c antiBlazeAngleDeg.
-	PEBlazedGrating(double period = 1.0, double blazeAngleDeg = 2.0, double antiBlazeAngleDeg = 30, const std::string& material = "Au") {
+	PEBlazedGrating(double period = 1.0, double blazeAngleDeg = 2.0, double antiBlazeAngleDeg = 30, const std::string& material = "Au", const std::string& coating = "Au", double coatingThickness = 0) {
 		profile_ = BlazedProfile;
 		period_ = period;
 		geo_[0] = blazeAngleDeg;
 		geo_[1] = antiBlazeAngleDeg;
-		material_ = material;
+		substrateMaterial_ = material;
+		coatingMaterial_ = coating;
+		coatingThickness_ = coatingThickness;
 	}
+
+	/// geo(0) is blaze, geo(1) is anti-blaze angle, both in degrees.
+	virtual double profileHeight() const { return period() / (1/tan(geo(0)*M_PI/180) + 1/tan(geo(1)*M_PI/180)); }
 };
 
 /// Sinusoidal grating subclass
 class PESinusoidalGrating : public PEGrating {
 public:
 	/// Constructs a grating with a perfect sinusoidal profile. The only required geometry parameter is the groove \c height, in um.
-	PESinusoidalGrating(double period = 1.0, double height = 0.05, const std::string& material = "Au") {
+	PESinusoidalGrating(double period = 1.0, double height = 0.05, const std::string& material = "Au", const std::string& coating = "Au", double coatingThickness = 0) {
 		profile_ = BlazedProfile;
 		period_ = period;
 		geo_[0] = height;
-		material_ = material;
+		substrateMaterial_ = material;
+		coatingMaterial_ = coating;
+		coatingThickness_ = coatingThickness;
 	}
+
+	/// geo(0) is the depth, aka height.
+	virtual double profileHeight() const { return geo(0); }
 };
 
 /// Trapezoidal grating subclass
 class PETrapezoidalGrating : public PEGrating {
 public:
 	/// Constructs a grating with a trapezoidal profile. The required geometry parameters are the \c height, in um, the \c valleyWidth, in um, the blaze angle \c blazeAngleDeg, in deg., and the anti-blaze angle \c antiBlazeAngleDeg.
-	PETrapezoidalGrating(double period = 1.0, double height = 0.05, double valleyWidth = 0.5, double blazeAngleDeg = 30.0, double antiBlazeAngleDeg = 30.0, const std::string& material = "Au") {
+	PETrapezoidalGrating(double period = 1.0, double height = 0.05, double valleyWidth = 0.5, double blazeAngleDeg = 30.0, double antiBlazeAngleDeg = 30.0, const std::string& material = "Au", const std::string& coating = "Au", double coatingThickness = 0) {
 		profile_ = BlazedProfile;
 		period_ = period;
 		geo_[0] = height;
 		geo_[1] = valleyWidth;
 		geo_[2] = blazeAngleDeg;
 		geo_[3] = antiBlazeAngleDeg;
-		material_ = material;
+		substrateMaterial_ = material;
+		coatingMaterial_ = coating;
+		coatingThickness_ = coatingThickness;
 	}
+
+	/// geo(0) is the depth, aka height.
+	virtual double profileHeight() const { return geo(0); }
 };
 
 #endif
