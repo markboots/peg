@@ -103,6 +103,8 @@ public:
 	std::string substrateMaterial() const { return substrateMaterial_; }
 	/// Returns the coating material code (ex: "Ni", "Au", etc.)
 	std::string coatingMaterial() const { return coatingMaterial_; }
+	/// Returns the coating thickness, or 0 if there is o coating.
+	double coatingThickness() const { return coatingThickness_; }
 	
 	/// Returns the complex refractive index of the substrate at a given wavelength \c wl in um.  Returns gsl_complex_rect(0,0) if the substrate material's database was not found.
 	gsl_complex substrateRefractiveIndex(double wl) const { return refractiveIndex(wl, substrateMaterial_); }
@@ -174,6 +176,16 @@ protected:
 	std::string coatingMaterial_;
 	/// The thickness of the coating (um), or 0 for no coating.
 	double coatingThickness_;
+
+	// Helper functions:
+	/////////////////////////////
+
+	/// Implements computeK2StepsAtY() for no coating.
+	int computeK2StepsAtY_noCoating(double y, gsl_complex k2_vaccuum, gsl_complex k2_substrate, gsl_complex k2_coating, double* stepsX, gsl_complex* stepsK2) const;
+	/// Implements computeK2StepsAtY() for an interpenetrating coating.
+	int computeK2StepsAtY_interpenetratingCoating(double y, gsl_complex k2_vaccuum, gsl_complex k2_substrate, gsl_complex k2_coating, double* stepsX, gsl_complex* stepsK2) const;
+	/// Implements computeK2StepsAtY() for a thick (non-interpenetrating) coating.
+	int computeK2StepsAtY_thickCoating(double y, gsl_complex k2_vaccuum, gsl_complex k2_substrate, gsl_complex k2_coating, double* stepsX, gsl_complex* stepsK2) const;
 };
 
 /// Rectangular grating subclass

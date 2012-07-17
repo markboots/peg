@@ -95,7 +95,13 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	// get material refractive index at wavelength
 	v_1_ = g_.substrateRefractiveIndex(wl_);
 	if(GSL_REAL(v_1_) == 0.0 && GSL_IMAG(v_1_) == 0.0) {
-		return PEResult(PEResult::MissingRefractiveDataFailure);
+		return PEResult::MissingRefractiveDataFailure;
+	}
+	if(g_.coatingThickness() > 0) {
+		v_c_ = g_.coatingRefractiveIndex(wl_);
+		if(GSL_REAL(v_c_) == 0.0 && GSL_IMAG(v_c_) == 0.0) {
+			return PEResult::MissingRefractiveDataFailure;
+		}
 	}
 
 	timing_[1] = time_;
@@ -275,20 +281,22 @@ gsl_complex PESolver::complex_sqrt_upperComplexPlane(gsl_complex z) {
 PEResult::Code PESolver::computeGratingExpansion(double y, gsl_complex* k2) const {
 	
 	// wave number in free space: k_2 = v_2 * w / c.  v_2 = 1 in empty space, so k_2 = 2pi / wl.
-	gsl_complex k_2 = gsl_complex_rect(2 * M_PI / wl_, 0);
-	// wave number in the grating: k_1 = v_1 * w / c = v_1 * 2pi / wl = v_1 * k_2.
-	gsl_complex k_1 = gsl_complex_mul(v_1_, k_2);
+	gsl_complex k_M = gsl_complex_rect(2 * M_PI / wl_, 0);
+	// wave number in the substrate: k_1 = v_1 * w / c = v_1 * 2pi / wl = v_1 * k_2.
+	gsl_complex k_1 = gsl_complex_mul(v_1_, k_M);
+	// wave number in the coating layer:
+	gsl_complex k_c = gsl_complex_mul(v_c_, k_M);
 	
-	// square them to get k^2_2 and k^2_1:
-	gsl_complex k2_2 = gsl_complex_mul(k_2, k_2);
+	// square them to get k^2_M, k^2_1 and k^2_c:
+	gsl_complex k2_M = gsl_complex_mul(k_M, k_M);
 	gsl_complex k2_1 = gsl_complex_mul(k_1, k_1);
-	gsl_complex k2_c = gsl_complex_rect(0,0);	/// \todo
+	gsl_complex k2_c = gsl_complex_mul(k_c, k_c);
 
 	double stepsX[PEG_MAX_PROFILE_CROSSINGS];
 	gsl_complex stepsK2[PEG_MAX_PROFILE_CROSSINGS];
 
 	// Compute multistep function from grating:
-	int numSteps = g_.computeK2StepsAtY(y, k2_2, k2_1, k2_c, stepsX, stepsK2);
+	int numSteps = g_.computeK2StepsAtY(y, k2_M, k2_1, k2_c, stepsX, stepsK2);
 	if(numSteps < 1)
 		return PEResult::InvalidGratingFailure;
 
@@ -723,7 +731,15 @@ void PESolver::computeGratingExpansion(const double *stepsX, const gsl_complex *
 	double d = g_.period();
 	double K = 2*M_PI/d;
 
-	/// \warning assumes numSteps is in (0, PEG_MAX_PROFILE_CROSSINGS]
+	/// \warning assumes numSteps is in [1, PEG_MAX_PROFILE_CROSSINGS]
+
+	// Optimization for numSteps = 1: f_n = 0 (n!=0).   f_0 = stepsK2[0].
+	if(numSteps == 1) {
+		for(int i=0; i<twoNp1_; ++i)
+			k2[i] = gsl_complex_rect(0,0);
+		k2[N_] = stepsK2[0];
+		return;
+	}
 
 	// compute sigma values at crossings:
 	// sigma[p] = stepsK2[p+1] - stepsK2[p] for p<numSteps-1; sigma[numSteps-1]=sigma[0]-sigma[numSteps-1]

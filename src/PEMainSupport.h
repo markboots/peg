@@ -31,7 +31,8 @@ public:
 	PEGrating::Profile profile;
 	double period;
 	double geometry[8];
-	std::string material;
+	std::string material, coating;
+	double coatingThickness;
 
 	std::string outputFile, progressFile;
 

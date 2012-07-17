@@ -52,6 +52,12 @@ Output:
 	
 --eV
 	If this flag is included, all wavelength inputs (--min, --max, --increment, and --wavelength) will instead be interpreted as photon energies in electron volts (eV).
+
+--coatingThickness <thickness in um>
+	If provided, creates a layer of --coatingMaterial on top of the basic grating profile, by translating the profile vertically by coatingThickness um. Used to model overcoated, oxidized, or dielectric gratings.
+
+--coatingMaterial <coating material>
+	Required if a non-zero --coatingThickness is provided. This should be a name corresponding to a refractive index database filename, ex: Au, Ni, C, MgF2, etc.
 	
 --printDebugOutput
 	If this flag is included, each calculation will print intermediate results to standard output.
@@ -124,6 +130,8 @@ gratingType=blazed
 gratingPeriod=1
 gratingGeometry=2.5,30
 gratingMaterial=Au
+coatingMaterial=[none]
+coatingThickness=0
 N=15
 integrationTolerance=1e-5
 # Progress
@@ -182,16 +190,16 @@ int main(int argc, char** argv) {
 	PEGrating* grating;
 	switch(io.profile) {
 	case PEGrating::RectangularProfile:
-		grating = new PERectangularGrating(io.period, io.geometry[0], io.geometry[1], io.material);
+		grating = new PERectangularGrating(io.period, io.geometry[0], io.geometry[1], io.material, io.coating, io.coatingThickness);
 		break;
 	case PEGrating::BlazedProfile:
-		grating = new PEBlazedGrating(io.period, io.geometry[0], io.geometry[1], io.material);
+		grating = new PEBlazedGrating(io.period, io.geometry[0], io.geometry[1], io.material, io.coating, io.coatingThickness);
 		break;
 	case PEGrating::SinusoidalProfile:
-		grating = new PESinusoidalGrating(io.period, io.geometry[0], io.material);
+		grating = new PESinusoidalGrating(io.period, io.geometry[0], io.material, io.coating, io.coatingThickness);
 		break;
 	case PEGrating::TrapezoidalProfile:
-		grating = new PETrapezoidalGrating(io.period, io.geometry[0], io.geometry[1], io.geometry[2], io.geometry[3], io.material);
+		grating = new PETrapezoidalGrating(io.period, io.geometry[0], io.geometry[1], io.geometry[2], io.geometry[3], io.material, io.coating, io.coatingThickness);
 		break;
 	default:
 		grating = 0;	// this will never happen; input validation assures one of the valid grating types.

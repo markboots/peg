@@ -154,8 +154,10 @@ protected:
 		
 	/// wavelength for the current calculation
 	double wl_;
-	/// refractive index of the grating material, at wl_
+	/// refractive index of the grating substrate material, at wl_
 	gsl_complex v_1_;
+	/// refractive index of the coating material, at wl_
+	gsl_complex v_c_;
 
 	/// The y-coordinate of the infinitely-thin Rayleigh layer at y_m, with m = [1, M_ - 1].  y_[0] is unused, so that we can take y_m = y_[m].
 	double* y_;

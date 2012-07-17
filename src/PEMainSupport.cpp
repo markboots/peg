@@ -18,6 +18,7 @@ void PECommandLineOptions::init() {
 	threads = 1;	// by default, just one thread.
 	measureTiming = false;
 	integrationTolerance = 1e-5;	// default: 1e-5 if not provided.
+	coatingThickness = 0;	// default: 0 (no coating) if not provided.
 }
 
 // Sets options based on command-line input arguments. Returns isValid().
@@ -48,6 +49,8 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 				{"threads", required_argument, 0, 18},
 				{"measureTiming", no_argument, 0, 19},
 				{"integrationTolerance", required_argument, 0, 20},
+				{"coatingMaterial", required_argument, 0, 21},
+				{"coatingThickness", required_argument, 0, 22},
 				{0, 0, 0, 0}
 			};
 				
@@ -161,6 +164,12 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 			case 20: // integrationTolerance
 				integrationTolerance = atof(optarg);
 				break;
+			case 21: // coatingMaterial
+				coating = optarg;
+				break;
+			case 22: // coatingThickness
+				coatingThickness = atof(optarg);
+				break;
 			}
 		} // end of loop over input options.
 				
@@ -194,7 +203,10 @@ bool PECommandLineOptions::isValid() {
 		if(material.empty()) throw "The grating material --gratingMaterial must be provided.";
 		// todo: check that material is valid.
 		if(period == DBL_MAX) throw "The grating period --gratingPeriod must be provided.";
-		
+
+		if(coatingThickness != 0 && coating.empty()) throw "A coating thickness was specified, but this requires a --coatingMaterial.";
+		if(!coating.empty() && coatingThickness == 0) throw "A coating material was specified, but this requires a non-zero --coatingThickness.";
+
 		if(profile == PEGrating::RectangularProfile && (geometry[0] == DBL_MAX || geometry[1] == DBL_MAX)) throw "The rectangular profile requires two arguments to --gratingGeometry <depth>,<valleyWidth>.";
 		if(profile == PEGrating::BlazedProfile && (geometry[0] == DBL_MAX || geometry[1] == DBL_MAX)) throw "The blazed profile requires two arguments to --gratingGeometry <blazeAngleDeg>,<antiBlazeAngleDeg>.";
 		if(profile == PEGrating::SinusoidalProfile && (geometry[0] == DBL_MAX)) throw "The sinusoidal profile requires one arguments to --gratingGeometry <depth>.";
@@ -277,6 +289,14 @@ void writeOutputFileHeader(std::ostream& of, const PECommandLineOptions& io) {
 	of << std::endl;
 	
 	of << "gratingMaterial=" << io.material << std::endl;
+	if(io.coatingThickness > 0) {
+		of << "coatingMaterial=" << io.coating << std::endl;
+		of << "coatingThickness=" << io.coatingThickness << std::endl;
+	}
+	else {
+		of << "coatingMaterial=[none]" << std::endl;
+		of << "coatingThickness=0" << std::endl;
+	}
 	
 	of << "N=" << io.N << std::endl;
 	of << "integrationTolerance=" << io.integrationTolerance << std::endl;

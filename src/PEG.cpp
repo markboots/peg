@@ -158,6 +158,18 @@ std::ostream& operator<<(std::ostream& os, const PEResult& result) {
 
 int PEGrating::computeK2StepsAtY(double y, gsl_complex k2_vaccuum, gsl_complex k2_substrate, gsl_complex k2_coating, double *stepsX, gsl_complex *stepsK2) const
 {
+	if(coatingThickness_ <= 0)
+		return computeK2StepsAtY_noCoating(y, k2_vaccuum, k2_substrate, k2_coating, stepsX, stepsK2);
+	else if(coatingThickness_ < profileHeight())
+		return computeK2StepsAtY_interpenetratingCoating(y, k2_vaccuum, k2_substrate, k2_coating, stepsX, stepsK2);
+	else
+		return computeK2StepsAtY_thickCoating(y, k2_vaccuum, k2_substrate, k2_coating, stepsX, stepsK2);
+}
+
+int PEGrating::computeK2StepsAtY_noCoating(double y, gsl_complex k2_vaccuum, gsl_complex k2_substrate, gsl_complex k2_coating, double *stepsX, gsl_complex *stepsK2) const {
+
+	(void)k2_coating;	// unused.
+
 	double x1 = xIntersection1(y);
 	double x2 = xIntersection2(y);
 	double d = period();
@@ -189,4 +201,100 @@ int PEGrating::computeK2StepsAtY(double y, gsl_complex k2_vaccuum, gsl_complex k
 	stepsK2[1] = k2_substrate;
 
 	return 2;
+}
+
+int PEGrating::computeK2StepsAtY_interpenetratingCoating(double y, gsl_complex k2_vaccuum, gsl_complex k2_substrate, gsl_complex k2_coating, double *stepsX, gsl_complex *stepsK2) const {
+
+	double d = period();
+
+	// three regions based on y: less than the coating thickness, from coating thickness to profile height, and above.
+
+	if(y <= coatingThickness_) {	// two crossings.  k^2 = k2_coating at first, k2_substrate at second.
+
+		stepsX[0] = xIntersection1(y);
+		stepsK2[0] = k2_coating;
+
+		stepsX[1] = xIntersection2(y);
+		stepsK2[1] = k2_substrate;
+
+		// validity check:
+		if(stepsX[0] < 0 || stepsX[1] < 0 || stepsX[0] > d || stepsX[1] > d || stepsX[1] < stepsX[0] - 1e-10)
+			return -1;
+		if(stepsX[1] < stepsX[0]) stepsX[1] = stepsX[0];
+
+		return 2;
+	}
+	else if(y <= profileHeight()) {	// four crossings: vacuum, coating, substrate, coating.
+		stepsX[0] = xIntersection1(y-coatingThickness_);
+		stepsK2[0] = k2_vaccuum;
+
+		stepsX[1] = xIntersection1(y);
+		stepsK2[1] = k2_coating;
+
+		stepsX[2] = xIntersection2(y);
+		stepsK2[2] = k2_substrate;
+
+		stepsX[3] = xIntersection2(y-coatingThickness_);
+		stepsK2[3] = k2_coating;
+
+		for(int i=0; i<4; ++i)
+			if(stepsX[i] < 0 || stepsX[i] > d)
+				return -1;
+
+		return 4;
+	}
+	else {	// two crossings: vacuum, coating.
+		stepsX[0] = xIntersection1(y-coatingThickness_);
+		stepsK2[0] = k2_vaccuum;
+
+		stepsX[1] = xIntersection2(y-coatingThickness_);
+		stepsK2[1] = k2_coating;
+
+		if(stepsX[0] < 0 || stepsX[0] > d || stepsX[1] < 0 || stepsX[1] > d || stepsX[1] < stepsX[0] - 1e-10)
+			return -1;
+		if(stepsX[1] < stepsX[0]) stepsX[1] = stepsX[0];
+
+		return 2;
+	}
+}
+
+int PEGrating::computeK2StepsAtY_thickCoating(double y, gsl_complex k2_vaccuum, gsl_complex k2_substrate, gsl_complex k2_coating, double *stepsX, gsl_complex *stepsK2) const {
+
+	double d = period();
+
+	// three regions based on y: crossing the substrate bump (y < profileHeight()), inside the homogeneous coating layer (y < coatingThickness_), and crossing the coating bump.
+
+	if(y <= profileHeight()) {	// two crossings: coating, substrate.
+		stepsX[0] = xIntersection1(y);
+		stepsK2[0] = k2_coating;
+
+		stepsX[1] = xIntersection2(y);
+		stepsK2[1] = k2_substrate;
+
+		// validity check:
+		if(stepsX[0] < 0 || stepsX[1] < 0 || stepsX[0] > d || stepsX[1] > d || stepsX[1] < stepsX[0] - 1e-10)
+			return -1;
+		if(stepsX[1] < stepsX[0]) stepsX[1] = stepsX[0];
+
+		return 2;
+	}
+	else if(y <= coatingThickness_) {	// homogeneous layer in coating.
+		stepsX[0] = 0;
+		stepsK2[0] = k2_coating;
+		return 1;
+	}
+	else {	// two crossings: vaccuum, coating.
+		stepsX[0] = xIntersection1(y-coatingThickness_);
+		stepsK2[0] = k2_vaccuum;
+
+		stepsX[1] = xIntersection2(y-coatingThickness_);
+		stepsK2[1] = k2_coating;
+
+		// validity check:
+		if(stepsX[0] < 0 || stepsX[1] < 0 || stepsX[0] > d || stepsX[1] > d || stepsX[1] < stepsX[0] - 1e-10)
+			return -1;
+		if(stepsX[1] < stepsX[0]) stepsX[1] = stepsX[0];
+
+		return 2;
+	}
 }
