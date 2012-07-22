@@ -2,7 +2,7 @@
 #PBS -S /bin/bash
 #PBS -r n
 #PBS -l procs=8
-#PBS -l walltime=00:10:00
+#PBS -l walltime=00:60:00
 #PBS -l pmem=600m
 #PBS -m bea
 #PBS -M markjboots@gmail.com
@@ -15,10 +15,16 @@ echo "---------------------"
 cat $PBS_NODEFILE
 echo "---------------------"
 
-DATE=`date --rfc-3339=seconds`
+DATE=`date --rfc-3339=ns`
 NUM_PROCS=`/bin/awk 'END {print NR}' $PBS_NODEFILE`
 echo "Running on $NUM_PROCS processors."
 
 echo "prog started at: `date`"
-mpiexec -n ${NUM_PROCS} ./pegMPI --mode constantIncidence --min 100 --max 131 --increment 1 --incidenceAngle 88 --outputFile "output/${DATE}.txt" --progressFile "output/progress${DATE}.txt" --gratingType blazed --gratingPeriod 1 --gratingMaterial Au --N 15 --gratingGeometry 2.5,30 --eV
+
+REPS=30
+for ((i=1;i<=REPS;i++))
+do
+  mpiexec -n ${NUM_PROCS} ./pegMPI --mode constantIncidence --min 100 --max 131 --increment 1 --incidenceAngle 88 --outputFile "output/${DATE}.txt" --progressFile "output/progress${DATE}.txt" --gratingType blazed --gratingPeriod 1 --gratingMaterial Au --N 15 --gratingGeometry 2.5,30 --eV
+done
+
 echo "prog finished at: `date`"
