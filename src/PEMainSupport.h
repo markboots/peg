@@ -26,17 +26,20 @@ public:
 	int toOrder;
 
 	int N;
+	double integrationTolerance;
 
 	PEGrating::Profile profile;
 	double period;
 	double geometry[8];
-	std::string material;
+	std::string material, coating;
+	double coatingThickness;
 
 	std::string outputFile, progressFile;
 
 	bool eV;
 	bool printDebugOutput;
 	int threads;
+	bool measureTiming;
 	////////////////////////////////
 	
 	/// Default constructor initializes all input variables to recognizable values. Doubles are set to DBL_MAX, and integers are set to INT_MAX.
