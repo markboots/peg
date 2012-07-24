@@ -38,6 +38,8 @@ void PECommandLineOptions::init() {
 	measureTiming = false;
 	integrationTolerance = 1e-5;	// default: 1e-5 if not provided.
 	coatingThickness = 0;	// default: 0 (no coating) if not provided.
+
+	showLegal = false;
 }
 
 // Sets options based on command-line input arguments. Returns isValid().
@@ -70,6 +72,7 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 				{"integrationTolerance", required_argument, 0, 20},
 				{"coatingMaterial", required_argument, 0, 21},
 				{"coatingThickness", required_argument, 0, 22},
+				{"showLegal", no_argument, 0, 23},
 				{0, 0, 0, 0}
 			};
 				
@@ -188,6 +191,9 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 				break;
 			case 22: // coatingThickness
 				coatingThickness = atof(optarg);
+				break;
+			case 23: // showLegal
+				showLegal = true;
 				break;
 			}
 		} // end of loop over input options.

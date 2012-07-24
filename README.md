@@ -46,13 +46,13 @@ Running
 Single-computer version 'pegSerial':
 
 ```
-> ./pegSerial --mode constantIncidence --min 100 --max 900 --increment 5 --eV --N 15 --gratingType blazed --gratingMaterial Pt --gratingPeriod 1.2 --gratingGeometry 1.2,30 --outputFile blazedResults.txt --progressFile progress.txt
+> ./pegSerial --mode constantIncidence --min 100 --max 900 --increment 5 --eV --incidenceAngle 87 --N 15 --gratingType blazed --gratingMaterial Pt --gratingPeriod 1.2 --gratingGeometry 1.2,30 --outputFile blazedResults.txt --progressFile progress.txt
 ```
 
 Cluster-version:
 
 ```
-> mpiexec -n <number of nodes> ./pegMPI --mode constantIncidence --min 100 --max 900 --increment 5 --eV --N 15 --gratingType blazed --gratingMaterial Pt --gratingPeriod 1.2 --gratingGeometry 1.2,30 --outputFile blazedResults.txt --progressFile progress.txt
+> mpiexec -n <number of nodes> ./pegMPI --mode constantIncidence --min 100 --max 900 --increment 5 --eV  --incidenceAngle 87 --N 15 --gratingType blazed --gratingMaterial Pt --gratingPeriod 1.2 --gratingGeometry 1.2,30 --outputFile blazedResults.txt --progressFile progress.txt
 ```
 
 Command-line options:
