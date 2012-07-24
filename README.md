@@ -31,12 +31,14 @@ The 'qmake' build tool from the Qt Framework can be used to generate Makefiles b
 
 This will build the single-machine command-line program 'pegSerial':
 
+```
 qmake PEG_ubuntu.pro
 make
+```
 
-The pegSerial application can take advantage of fine-grained parallelization to use many threads (for example, as many threads as CPU cores on your machine).
+The pegSerial application can take advantage of fine-grained parallelization to use more than one thread (for example, as many threads as CPU cores on your machine). This speeds up the calculation of a single efficiency data point.
 
-There is also an application to exploit coarse-grained parallelization over an arbitrary number of nodes in a cluster or grid computer, using MPI. To build this program, create a makefile based on src/Makefile.template.
+There is also an application to exploit coarse-grained parallelization over an arbitrary number of nodes in a cluster or grid computer, using MPI. This speeds up the calculation of many efficiency data points.  To build the pegMPI program, create a makefile based on src/Makefile.example.
 
 Running
 ========
@@ -145,7 +147,7 @@ totalSteps=41
 ...
 ```
 
-The Output table lists reflected efficiencies at each (wavelength/eV/incidence angle) sequentially from the -N order to the +N order.  (Efficiencies are 0 if the orders are evanescent instead of propagating.)  Note that we use the sign convention where inside orders are negative (n < 0), corresponding to the diffraction equation:
+The Output table lists reflected efficiencies at each (wavelength/eV/incidence angle) sequentially from the -N order to the +N order.  (Efficiencies are 0 if the orders are evanescent instead of propagating.)  Note that we use the sign convention where _inside diffraction orders_ are negative (n < 0), corresponding to the grating equation:
 
 sin(beta) = sin(alpha) + n \lambda / d
 
