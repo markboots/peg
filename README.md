@@ -1,7 +1,7 @@
 About
 ========
 
-PEG ("Parallel Efficiency of Gratings") is a tool for calculating the efficiency of diffraction gratings, particularly those used in the Soft X-ray regime.  Developed by the Materials Research Group in the Department of Physics at the University of Saskatchewan, it was used to characterize the optical components for the REIXS XES beamline at the Canadian Light Source. It implements the _differential theory_ developed by Neviere, Vincent, and Petit [1], and is updated for stability using the _S-matrix formulation_ of Li [2].
+PEG ("Parallel Efficiency of Gratings") is a tool for calculating the efficiency of diffraction gratings, particularly those used in the Soft X-ray regime.  Developed by the Materials Research Group in the Department of Physics at the University of Saskatchewan (http://beamteam.usask.ca), it was used to characterize the optical components for the REIXS XES beamline at the Canadian Light Source. It implements the _differential theory_ developed by Neviere, Vincent, and Petit [1], and is updated for stability using the _S-matrix formulation_ of Li [2].
 
 Features
 ========
