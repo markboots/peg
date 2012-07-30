@@ -30,7 +30,6 @@ void PECommandLineOptions::init() {
 
 	profile = PEGrating::InvalidProfile;
 	period = DBL_MAX;
-	geometry[0] = geometry[1] = geometry[2] = geometry[3] = geometry[4] = geometry[5] = geometry[6] = geometry[7] = DBL_MAX;
 
 	eV = false;
 	printDebugOutput = false;
@@ -149,10 +148,9 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 				//if(!optarg) throw "An argument to --gratingGeometry must be provided, with a list of geometry parameters.";
 				char* saveptr;
 				char* token;
-				int i=0;
 				token = strtok_r(optarg, ",", &saveptr);
-				while(token && i<8) {
-					geometry[i++] = atof(token);
+				while(token) {
+					geometry.push_back(atof(token));
 					token = strtok_r(0, ",", &saveptr);
 				}
 				break;
@@ -232,10 +230,11 @@ bool PECommandLineOptions::isValid() {
 		if(coatingThickness != 0 && coating.empty()) throw "A coating thickness was specified, but this requires a --coatingMaterial.";
 		if(!coating.empty() && coatingThickness == 0) throw "A coating material was specified, but this requires a non-zero --coatingThickness.";
 
-		if(profile == PEGrating::RectangularProfile && (geometry[0] == DBL_MAX || geometry[1] == DBL_MAX)) throw "The rectangular profile requires two arguments to --gratingGeometry <depth>,<valleyWidth>.";
-		if(profile == PEGrating::BlazedProfile && (geometry[0] == DBL_MAX || geometry[1] == DBL_MAX)) throw "The blazed profile requires two arguments to --gratingGeometry <blazeAngleDeg>,<antiBlazeAngleDeg>.";
-		if(profile == PEGrating::SinusoidalProfile && (geometry[0] == DBL_MAX)) throw "The sinusoidal profile requires one arguments to --gratingGeometry <depth>.";
-		if(profile == PEGrating::TrapezoidalProfile && (geometry[0] == DBL_MAX || geometry[1] == DBL_MAX || geometry[2] == DBL_MAX || geometry[3] == DBL_MAX)) throw "The trapezoidal profile requires four arguments to --gratingGeometry <depth>,<valleyWidth>,<blazeAngle>,<antiBlazeAngle>.";
+		if(profile == PEGrating::RectangularProfile && geometry.size() != 2) throw "The rectangular profile requires two arguments to --gratingGeometry <depth>,<valleyWidth>.";
+		if(profile == PEGrating::BlazedProfile && geometry.size() != 2) throw "The blazed profile requires two arguments to --gratingGeometry <blazeAngleDeg>,<antiBlazeAngleDeg>.";
+		if(profile == PEGrating::SinusoidalProfile && geometry.size() != 1) throw "The sinusoidal profile requires one arguments to --gratingGeometry <depth>.";
+		if(profile == PEGrating::TrapezoidalProfile && geometry.size() != 4) throw "The trapezoidal profile requires four arguments to --gratingGeometry <depth>,<valleyWidth>,<blazeAngle>,<antiBlazeAngle>.";
+		if(profile == PEGrating::CustomProfile && geometry.size() == 0) throw "The custom (point-wise) profile requires arguments to --gratingGeometry: a sequence of (x,y) points along the profile going from (0,0) to (<period>,0).";
 		
 		if(N == INT_MAX) throw "The truncation index --N must be provided.";
 		if(threads < 1) throw "The number of --threads to use for fine parallelization must be a positive number, at least 1.";
@@ -304,12 +303,10 @@ void writeOutputFileHeader(std::ostream& of, const PECommandLineOptions& io) {
 	of << "gratingPeriod=" << io.period << std::endl;
 	
 	of << "gratingGeometry=";
-	for(int i=0;i<8;++i) {
-		if(io.geometry[i] == DBL_MAX)
-			break;
+	for(int i=0,cc=io.geometry.size(); i<cc; ++i) {
 		if(i!=0)
 			of << ",";
-		of << io.geometry[i];
+		of << io.geometry.at(i);
 	}
 	of << std::endl;
 	

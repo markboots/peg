@@ -113,7 +113,7 @@ public:
 	/// Returns the grating periodicity, in um
 	double period() const { return period_; }
 	/// Returns profile-dependent geometry parameters
-	double geo(int parameterIndex) const { return geo_[parameterIndex]; }
+	double geo(int parameterIndex) const { return geo_.at(parameterIndex); }
 	/// Returns the height from the substrate surface (y=0) to the highest feature. If the grating has a coating, this should include the coating.
 	/*! This is shape-dependent, but the base class implementation handles the default rectangular, blazed, sinusoidal, and trapezoidal profiles. Re-implement for custom profiles.*/
 	virtual double totalHeight() const { return profileHeight() + coatingThickness_; }
@@ -188,7 +188,7 @@ protected:
 	/// Grating periodicity, in um
 	double period_;
 	/// General geometry parameters. Interpretation depends on profile.
-	double geo_[8];
+	std::vector<double> geo_;
 	/// Substrate material
 	std::string substrateMaterial_;
 	/// Coating material
@@ -214,6 +214,7 @@ public:
 	PERectangularGrating(double period = 1.0, double height = 0.05, double valleyWidth = 0.5, const std::string& material = "Au", const std::string& coating = "Au", double coatingThickness = 0) {
 		profile_ = RectangularProfile;
 		period_ = period;
+		geo_.resize(2);
 		geo_[0] = height;
 		geo_[1] = valleyWidth;
 		substrateMaterial_ = material;
@@ -237,6 +238,7 @@ public:
 	PEBlazedGrating(double period = 1.0, double blazeAngleDeg = 2.0, double antiBlazeAngleDeg = 30, const std::string& material = "Au", const std::string& coating = "Au", double coatingThickness = 0) {
 		profile_ = BlazedProfile;
 		period_ = period;
+		geo_.resize(2);
 		geo_[0] = blazeAngleDeg;
 		geo_[1] = antiBlazeAngleDeg;
 		substrateMaterial_ = material;
@@ -260,6 +262,7 @@ public:
 	PESinusoidalGrating(double period = 1.0, double height = 0.05, const std::string& material = "Au", const std::string& coating = "Au", double coatingThickness = 0) {
 		profile_ = BlazedProfile;
 		period_ = period;
+		geo_.resize(1);
 		geo_[0] = height;
 		substrateMaterial_ = material;
 		coatingMaterial_ = coating;
@@ -287,6 +290,7 @@ public:
 	PETrapezoidalGrating(double period = 1.0, double height = 0.05, double valleyWidth = 0.5, double blazeAngleDeg = 30.0, double antiBlazeAngleDeg = 30.0, const std::string& material = "Au", const std::string& coating = "Au", double coatingThickness = 0) {
 		profile_ = BlazedProfile;
 		period_ = period;
+		geo_.resize(4);
 		geo_[0] = height;
 		geo_[1] = valleyWidth;
 		geo_[2] = blazeAngleDeg;

@@ -49,7 +49,7 @@ public:
 
 	PEGrating::Profile profile;
 	double period;
-	double geometry[8];
+	std::vector<double> geometry;
 	std::string material, coating;
 	double coatingThickness;
 
