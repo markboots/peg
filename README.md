@@ -6,12 +6,15 @@ PEG ("Parallel Efficiency of Gratings") is a tool for calculating the efficiency
 Features
 ========
 
-- Standard grating shape profiles: rectangular, blazed (triangular), trapezoidal, sinusoidal.
-	- TODO: support for user-defined profiles
+- Standard grating shape profiles: rectangular, blazed (triangular), trapezoidal, sinusoidal
+- Custom grating shape profiles: any point-wise defined profile.
 - Coatings: an optional coating layer on top of the grating (user-defined thickness; thick or inter-penetrating)
+	- Note: Coatings are not (yet) supported on custom profiles.
 - Automatic lookup of complex refractive indexes for common materials from Henke data [3].
 - Several built-in scanning modes: over wavelength, over incidence angle, over wavelength maintaining constant deviation ("monochromator mode")
-- Support for parallel calculation, using either OpenMP, or MPI for grid computers.
+- Support for scalable parallel calculation:
+	- fine parallelization of a single calculation, using OpenMP
+	- coarse parallelization of many efficiency points, using MPI on grid computers.
 
 Limitations
 ========
