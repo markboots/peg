@@ -317,3 +317,52 @@ int PEGrating::computeK2StepsAtY_thickCoating(double y, gsl_complex k2_vaccuum, 
 		return 2;
 	}
 }
+
+int PECustomProfileGrating::computeK2StepsAtY(double y, gsl_complex k2_vaccuum, gsl_complex k2_substrate, gsl_complex k2_coating, double *stepsX, gsl_complex *stepsK2) const
+{
+	// coatings are not supported.
+	(void)k2_coating;
+	if(coatingThickness_ != 0)
+		return -1;
+
+	if(!isValid())
+		return -1;
+
+	int numCrossings = 0;
+
+	// move along points until y_i > y if searching for an entering point, or y_i <= y if searching for an exit point.
+	for(int i=0,cc=y_.size(); i<cc; ++i) {
+
+		if(numCrossings%2 == 0) {	// looking for an entry point.
+			if(y_[i] > y) {	// found it
+				double slope = (x_[i] - x_[i-1])/(y_[i]-y_[i-1]);
+				double x = x_[i-1] + slope*(y - y_[i-1]);
+
+				stepsK2[numCrossings] = k2_vaccuum;
+				stepsX[numCrossings++] = x;
+			}
+		}
+		else {// looking for an exit point.
+			if(y_[i] <= y) {	// found it
+				double slope = (x_[i] - x_[i-1])/(y_[i]-y_[i-1]);
+				double x = x_[i-1] + slope*(y - y_[i-1]);
+
+				stepsK2[numCrossings] = k2_substrate;
+				stepsX[numCrossings++] = x;
+			}
+		}
+	}
+
+	if(numCrossings%2 != 0)
+		return -1;	// there must be an even number of crossings: none, in-out, in-out-in-out, etc.
+
+	// No crossing: we are above the grating. Homogeneous vacuum.
+	if(numCrossings == 0) {
+		numCrossings = 1;
+		stepsK2[0] = k2_vaccuum;
+		stepsX[0] = 0;
+	}
+
+
+	return numCrossings;
+}

@@ -28,13 +28,14 @@ along with PEG.  If not, see <http://www.gnu.org/licenses/>.
 
 Grating specification:
 
---gratingType <rectangular|blazed|sinusoidal|trapezoidal>
+--gratingType <rectangular|blazed|sinusoidal|trapezoidal|custom>
 --gratingPeriod <grating period in um>
 --gratingGeometry <command-delimited list of geometry parameters, in um and/or degrees>
 	Rectangular profile: depth (um),valley width (um)
 	Blazed profile: blaze angle (deg),anti-blaze angle (deg)
 	Sinusoidal profile: depth (um)
 	Trapezoial profile: depth (um),valley width (um),blaze angle (deg),anti-blaze angle (deg)
+	Custom profile: depth (um), followed by list of (x,y) points that describe the surface profile y = g(x).  [x followed by y for each].  The points must go from (0,0) to (1,0) inclusive, and will be scaled so that (0,0)->(1,1) maps to (0,0)->(period,depth).  For example, an isosceles triangular profile with a depth of 0.1um would need three points; the list would be: {0.1,0,0,0.5,1,1,0}.
 
 --gratingMaterial <grating substrate material>
 	This should be a name corresponding to a refractive index database filename, ex: Au, Ni, C, SiO2, etc.
@@ -241,6 +242,9 @@ int main(int argc, char** argv) {
 		break;
 	case PEGrating::TrapezoidalProfile:
 		grating = new PETrapezoidalGrating(io.period, io.geometry[0], io.geometry[1], io.geometry[2], io.geometry[3], io.material, io.coating, io.coatingThickness);
+		break;
+	case PEGrating::CustomProfile:
+		grating = new PECustomProfileGrating(io.period, io.geometry, io.material);
 		break;
 	default:
 		grating = 0;	// this will never happen; input validation assures one of the valid grating types.

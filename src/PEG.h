@@ -260,7 +260,7 @@ class PESinusoidalGrating : public PEGrating {
 public:
 	/// Constructs a grating with a perfect sinusoidal profile. The only required geometry parameter is the groove \c height, in um.
 	PESinusoidalGrating(double period = 1.0, double height = 0.05, const std::string& material = "Au", const std::string& coating = "Au", double coatingThickness = 0) {
-		profile_ = BlazedProfile;
+		profile_ = SinusoidalProfile;
 		period_ = period;
 		geo_.resize(1);
 		geo_[0] = height;
@@ -288,7 +288,7 @@ class PETrapezoidalGrating : public PEGrating {
 public:
 	/// Constructs a grating with a trapezoidal profile. The required geometry parameters are the \c height, in um, the \c valleyWidth, in um, the blaze angle \c blazeAngleDeg, in deg., and the anti-blaze angle \c antiBlazeAngleDeg.
 	PETrapezoidalGrating(double period = 1.0, double height = 0.05, double valleyWidth = 0.5, double blazeAngleDeg = 30.0, double antiBlazeAngleDeg = 30.0, const std::string& material = "Au", const std::string& coating = "Au", double coatingThickness = 0) {
-		profile_ = BlazedProfile;
+		profile_ = TrapezoidalProfile;
 		period_ = period;
 		geo_.resize(4);
 		geo_[0] = height;
@@ -307,6 +307,60 @@ public:
 	virtual double xIntersection1(double y) const { (void)y; return -1; }
 	/// Returns the x-coordinate of the second intersection with the surface at \c y. \todo Not yet implemented!
 	virtual double xIntersection2(double y) const { (void)y; return -1; }
+};
+
+/// Custom grating subclass: profile is defined pointwise with a series of (x,y) points.
+class PECustomProfileGrating : public PEGrating {
+public:
+	/// Constructs a grating with a custom profile. The required geometry parameters \c geometry are a maximum height, followed by a vector of points (x_i followed by y_i) which must go from (x_0, y_0) = (0,0) to (x_I, y_I) = (1,0).  The \c points are scaled so that (0,0)->(1,1) maps to (0,0)->(period,maxHeight).
+	PECustomProfileGrating(double period = 1.0, const std::vector<double>& geometry = std::vector<double>(), const std::string& material = "Au") {
+		profile_ = CustomProfile;
+		period_ = period;
+		geo_ = geometry;
+		maxHeight_ = -1;
+		if(geometry.size() >= 7 && geometry.size()%2 == 1) {	// need at least 3 points (6 values) plus the max height. Total points in geometry must be odd.
+			maxHeight_ = geometry.front();
+			for(int i=1,cc=geometry.size(); i<cc-1; i+=2) {
+				x_.push_back(geometry.at(i)*period_);
+				y_.push_back(geometry.at(i+1)*maxHeight_);
+			}
+		}
+
+		substrateMaterial_ = material;
+		coatingThickness_ = 0;
+	}
+
+	/// Constructs a grating with a custom profile. The required geometry parameters are a \c maxHeight in um, followed by a vector of \c xPoints and \c yPoints from (x_0, y_0) = (0,0) to (x_I, y_I) = (1,0).  The \c points are scaled so that (0,0)->(1,1) maps to (0,0)->(period,maxHeight).
+	PECustomProfileGrating(double period, double maxHeight, const std::vector<double>& xPoints, const std::vector<double>& yPoints,const std::string& material = "Au") {
+		profile_ = CustomProfile;
+		period_ = period;
+		maxHeight_ = -1;
+
+		if(xPoints.size() == yPoints.size() && xPoints.size() >= 3) {
+			maxHeight_ = maxHeight;
+
+			for(int i=0,cc=xPoints.size(); i<cc; ++i)
+				x_.push_back(xPoints.at(i)*period_);
+			for(int i=0,cc=yPoints.size(); i<cc; ++i)
+				y_.push_back(yPoints.at(i)*maxHeight_);
+		}
+
+		substrateMaterial_ = material;
+		coatingThickness_ = 0;
+	}
+
+	bool isValid() const { return maxHeight_ >= 0; }
+
+	/// Depth / height.
+	virtual double profileHeight() const { return maxHeight_; }
+
+	/// Implements computing the K2 step values (intersections) for the custom profile at height \c y. \note Coatings are not supported!
+	virtual int computeK2StepsAtY(double y, gsl_complex k2_vaccuum, gsl_complex k2_substrate, gsl_complex k2_coating, double* stepsX, gsl_complex* stepsK2) const;
+
+protected:
+	double maxHeight_;
+	std::vector<double> x_;
+	std::vector<double> y_;
 };
 
 #endif

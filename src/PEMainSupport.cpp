@@ -142,7 +142,8 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 				else if(strcmp(optarg, "blazed") == 0) profile = PEGrating::BlazedProfile;
 				else if(strcmp(optarg, "sinusoidal") == 0) profile = PEGrating::SinusoidalProfile;
 				else if(strcmp(optarg, "trapezoidal") == 0) profile = PEGrating::TrapezoidalProfile;
-				else throw "The argument to --gratingType must be one of: rectangular, blazed, sinusoidal, or trapezoidal.";
+				else if(strcmp(optarg, "custom") == 0) profile = PEGrating::CustomProfile;
+				else throw "The argument to --gratingType must be one of: rectangular, blazed, sinusoidal, trapezoidal, or custom.";
 				break;
 			case 12: { // gratingGeometry
 				//if(!optarg) throw "An argument to --gratingGeometry must be provided, with a list of geometry parameters.";
@@ -234,7 +235,9 @@ bool PECommandLineOptions::isValid() {
 		if(profile == PEGrating::BlazedProfile && geometry.size() != 2) throw "The blazed profile requires two arguments to --gratingGeometry <blazeAngleDeg>,<antiBlazeAngleDeg>.";
 		if(profile == PEGrating::SinusoidalProfile && geometry.size() != 1) throw "The sinusoidal profile requires one arguments to --gratingGeometry <depth>.";
 		if(profile == PEGrating::TrapezoidalProfile && geometry.size() != 4) throw "The trapezoidal profile requires four arguments to --gratingGeometry <depth>,<valleyWidth>,<blazeAngle>,<antiBlazeAngle>.";
-		if(profile == PEGrating::CustomProfile && geometry.size() == 0) throw "The custom (point-wise) profile requires arguments to --gratingGeometry: a sequence of (x,y) points along the profile going from (0,0) to (<period>,0).";
+		if(profile == PEGrating::CustomProfile && (geometry.size() < 7 || geometry.size()%2 != 1)) throw "The custom (point-wise) profile requires arguments to --gratingGeometry: a maximum height (um), followed by a sequence of (x,y) points along the profile going from (0,0) to (1,0). They will be scaled so that (0,0)->(1,1) maps to (0,0)->(period,maxHeight).";
+
+		if(profile == PEGrating::CustomProfile && coatingThickness != 0) throw "The custom profile does not yet support coatings.";
 		
 		if(N == INT_MAX) throw "The truncation index --N must be provided.";
 		if(threads < 1) throw "The number of --threads to use for fine parallelization must be a positive number, at least 1.";
@@ -294,6 +297,9 @@ void writeOutputFileHeader(std::ostream& of, const PECommandLineOptions& io) {
 		break;
 		case PEGrating::TrapezoidalProfile:
 		of << "gratingType=trapezoidal" << std::endl;
+		break;
+		case PEGrating::CustomProfile:
+		of << "gratingType=custom" << std::endl;
 		break;
 		default:
 		of << "gratingType=invalid" << std::endl;
