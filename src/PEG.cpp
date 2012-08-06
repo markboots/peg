@@ -59,8 +59,10 @@ PEResult PEGrating::getEff(double incidenceDeg, double wl, const PEMathOptions& 
 }
 
 gsl_complex PEGrating::refractiveIndex(double wl, const std::string& material) {
-//	return gsl_complex_rect(0.993, 0.00754);
-//	return gsl_complex_rect(1.4, -0.);
+	// Override for testing:
+//	return gsl_complex_rect(0.993, 0.00754);	// Pt at 410 eV
+//	return gsl_complex_rect(1.4, -0.);	// plain glass in visible range.
+//	return gsl_complex_rect(0.993, 0);
 
 	// Attempt to open the material database file.
 	std::string fileName = std::string(PEG_MATERIALS_DB_PATH) + std::string("/") + material + std::string(".idx");
@@ -291,8 +293,10 @@ int PEGrating::computeK2StepsAtY_thickCoating(double y, gsl_complex k2_vaccuum, 
 		stepsK2[1] = k2_substrate;
 
 		// validity check:
-		if(stepsX[0] < 0 || stepsX[1] < 0 || stepsX[0] > d || stepsX[1] > d || stepsX[1] < stepsX[0] - 1e-10)
+		if(stepsX[0] < 0 || stepsX[1] < 0 || stepsX[0] > d || stepsX[1] > d || stepsX[1] < stepsX[0] - 1e-10) {
+//			std::cerr << "err 1:" << stepsX[0] << " " << stepsX[1];
 			return -1;
+		}
 		if(stepsX[1] < stepsX[0]) stepsX[1] = stepsX[0];
 
 		return 2;
@@ -310,8 +314,10 @@ int PEGrating::computeK2StepsAtY_thickCoating(double y, gsl_complex k2_vaccuum, 
 		stepsK2[1] = k2_coating;
 
 		// validity check:
-		if(stepsX[0] < 0 || stepsX[1] < 0 || stepsX[0] > d || stepsX[1] > d || stepsX[1] < stepsX[0] - 1e-10)
+		if(stepsX[0] < 0 || stepsX[1] < 0 || stepsX[0] > d || stepsX[1] > d || stepsX[1] < stepsX[0] - 1e-10) {
+//			std::cerr << "err 1:" << stepsX[0] << " " << stepsX[1];
 			return -1;
+		}
 		if(stepsX[1] < stepsX[0]) stepsX[1] = stepsX[0];
 
 		return 2;

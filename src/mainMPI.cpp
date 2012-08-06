@@ -184,7 +184,7 @@ int main(int argc, char** argv) {
 		if(io.showLegal) {
 			std::cout << "Copyright 2012 Mark Boots (mark.boots@usask.ca).\n\n"
 
-						 "This file is part of the Parallel Efficiency of Gratings project (\"PEG\").\n\n"
+						 "This program is part of the Parallel Efficiency of Gratings project (\"PEG\").\n\n"
 
 						 "PEG is free software: you can redistribute it and/or modify\n"
 						 "it under the terms of the GNU General Public License as published by\n"

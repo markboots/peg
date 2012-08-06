@@ -279,7 +279,23 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	}
 
 	if(printDebugOutput) {
-		std::cout << "Sum of efficiencies (should be <= 1): " << effSum << std::endl;
+		std::cout << "Sum of reflected efficiencies: " << effSum << std::endl;
+
+		// in debugging, let's also compute and sum the transmitted efficiencies:
+		double a = g_.totalHeight();
+		std::vector<gsl_complex> A1(twoNp1_);
+		std::vector<double> e_t(twoNp1_);
+		double sumTransmitted = 0;
+		for(int i=0; i<twoNp1_; i++) {
+			A1[i] = gsl_complex_mul(
+						gsl_matrix_complex_get(S22_, i, N_),
+						gsl_complex_exp(gsl_complex_mul_imag(betaM_[N_],
+															 -a)));
+			e_t[i] = gsl_complex_abs2(A1[i])*GSL_REAL(beta1_[i])/GSL_REAL(betaM_[N_]);
+			sumTransmitted += e_t[i];
+		}
+		std::cout << "Sum of transmitted efficiencies: " << sumTransmitted << std::endl;
+		std::cout << "Total efficiency (should be <= 1): " << sumTransmitted + effSum << std::endl;
 	}
 	
 	return result;
