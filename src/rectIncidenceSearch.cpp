@@ -41,11 +41,11 @@ int main(int argc, char** argv) {
 
 	// manual loop over incidence: 74 - 88.8 in 0.1 deg. steps
 	for(int i=0; i<149; ++i) {
-		if(rank == 0)
-			std::cout << "Searching incidence: " << incidence << std::endl;
 		MPI_Barrier(MPI_COMM_WORLD);
 
 		double incidence = 74 + i*0.1;
+		if(rank == 0)
+			std::cout << "Searching incidence: " << incidence << std::endl;
 
 		// determine depth we should calculate based on MPI rank
 		double height = startingHeight + rank*deltaHeight;
