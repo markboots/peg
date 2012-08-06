@@ -1,3 +1,22 @@
+/*
+Copyright 2012 Mark Boots (mark.boots@usask.ca).
+
+This file is part of the Parallel Efficiency of Gratings project ("PEG").
+
+PEG is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+PEG is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with PEG.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #ifndef PEMAINSUPPORT_H
 #define PEMAINSUPPORT_H
 
@@ -30,7 +49,7 @@ public:
 
 	PEGrating::Profile profile;
 	double period;
-	double geometry[8];
+	std::vector<double> geometry;
 	std::string material, coating;
 	double coatingThickness;
 
@@ -40,6 +59,9 @@ public:
 	bool printDebugOutput;
 	int threads;
 	bool measureTiming;
+
+	bool showLegal;
+
 	////////////////////////////////
 	
 	/// Default constructor initializes all input variables to recognizable values. Doubles are set to DBL_MAX, and integers are set to INT_MAX.

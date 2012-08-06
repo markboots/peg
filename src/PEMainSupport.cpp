@@ -1,3 +1,22 @@
+/*
+Copyright 2012 Mark Boots (mark.boots@usask.ca).
+
+This file is part of the Parallel Efficiency of Gratings project ("PEG").
+
+PEG is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+PEG is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with PEG.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include "PEMainSupport.h"
 #include <stdlib.h>
 #include <string.h>
@@ -11,7 +30,6 @@ void PECommandLineOptions::init() {
 
 	profile = PEGrating::InvalidProfile;
 	period = DBL_MAX;
-	geometry[0] = geometry[1] = geometry[2] = geometry[3] = geometry[4] = geometry[5] = geometry[6] = geometry[7] = DBL_MAX;
 
 	eV = false;
 	printDebugOutput = false;
@@ -19,6 +37,8 @@ void PECommandLineOptions::init() {
 	measureTiming = false;
 	integrationTolerance = 1e-5;	// default: 1e-5 if not provided.
 	coatingThickness = 0;	// default: 0 (no coating) if not provided.
+
+	showLegal = false;
 }
 
 // Sets options based on command-line input arguments. Returns isValid().
@@ -51,6 +71,7 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 				{"integrationTolerance", required_argument, 0, 20},
 				{"coatingMaterial", required_argument, 0, 21},
 				{"coatingThickness", required_argument, 0, 22},
+				{"showLegal", no_argument, 0, 23},
 				{0, 0, 0, 0}
 			};
 				
@@ -121,16 +142,16 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 				else if(strcmp(optarg, "blazed") == 0) profile = PEGrating::BlazedProfile;
 				else if(strcmp(optarg, "sinusoidal") == 0) profile = PEGrating::SinusoidalProfile;
 				else if(strcmp(optarg, "trapezoidal") == 0) profile = PEGrating::TrapezoidalProfile;
-				else throw "The argument to --gratingType must be one of: rectangular, blazed, sinusoidal, or trapezoidal.";
+				else if(strcmp(optarg, "custom") == 0) profile = PEGrating::CustomProfile;
+				else throw "The argument to --gratingType must be one of: rectangular, blazed, sinusoidal, trapezoidal, or custom.";
 				break;
 			case 12: { // gratingGeometry
 				//if(!optarg) throw "An argument to --gratingGeometry must be provided, with a list of geometry parameters.";
 				char* saveptr;
 				char* token;
-				int i=0;
 				token = strtok_r(optarg, ",", &saveptr);
-				while(token && i<8) {
-					geometry[i++] = atof(token);
+				while(token) {
+					geometry.push_back(atof(token));
 					token = strtok_r(0, ",", &saveptr);
 				}
 				break;
@@ -170,6 +191,9 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 			case 22: // coatingThickness
 				coatingThickness = atof(optarg);
 				break;
+			case 23: // showLegal
+				showLegal = true;
+				break;
 			}
 		} // end of loop over input options.
 				
@@ -207,10 +231,13 @@ bool PECommandLineOptions::isValid() {
 		if(coatingThickness != 0 && coating.empty()) throw "A coating thickness was specified, but this requires a --coatingMaterial.";
 		if(!coating.empty() && coatingThickness == 0) throw "A coating material was specified, but this requires a non-zero --coatingThickness.";
 
-		if(profile == PEGrating::RectangularProfile && (geometry[0] == DBL_MAX || geometry[1] == DBL_MAX)) throw "The rectangular profile requires two arguments to --gratingGeometry <depth>,<valleyWidth>.";
-		if(profile == PEGrating::BlazedProfile && (geometry[0] == DBL_MAX || geometry[1] == DBL_MAX)) throw "The blazed profile requires two arguments to --gratingGeometry <blazeAngleDeg>,<antiBlazeAngleDeg>.";
-		if(profile == PEGrating::SinusoidalProfile && (geometry[0] == DBL_MAX)) throw "The sinusoidal profile requires one arguments to --gratingGeometry <depth>.";
-		if(profile == PEGrating::TrapezoidalProfile && (geometry[0] == DBL_MAX || geometry[1] == DBL_MAX || geometry[2] == DBL_MAX || geometry[3] == DBL_MAX)) throw "The trapezoidal profile requires four arguments to --gratingGeometry <depth>,<valleyWidth>,<blazeAngle>,<antiBlazeAngle>.";
+		if(profile == PEGrating::RectangularProfile && geometry.size() != 2) throw "The rectangular profile requires two arguments to --gratingGeometry <depth>,<valleyWidth>.";
+		if(profile == PEGrating::BlazedProfile && geometry.size() != 2) throw "The blazed profile requires two arguments to --gratingGeometry <blazeAngleDeg>,<antiBlazeAngleDeg>.";
+		if(profile == PEGrating::SinusoidalProfile && geometry.size() != 1) throw "The sinusoidal profile requires one arguments to --gratingGeometry <depth>.";
+		if(profile == PEGrating::TrapezoidalProfile && geometry.size() != 4) throw "The trapezoidal profile requires four arguments to --gratingGeometry <depth>,<valleyWidth>,<blazeAngle>,<antiBlazeAngle>.";
+		if(profile == PEGrating::CustomProfile && (geometry.size() < 7 || geometry.size()%2 != 1)) throw "The custom (point-wise) profile requires arguments to --gratingGeometry: a maximum height (um), followed by a sequence of (x,y) points along the profile going from (0,0) to (1,0). They will be scaled so that (0,0)->(1,1) maps to (0,0)->(period,maxHeight).";
+
+		if(profile == PEGrating::CustomProfile && coatingThickness != 0) throw "The custom profile does not yet support coatings.";
 		
 		if(N == INT_MAX) throw "The truncation index --N must be provided.";
 		if(threads < 1) throw "The number of --threads to use for fine parallelization must be a positive number, at least 1.";
@@ -271,6 +298,9 @@ void writeOutputFileHeader(std::ostream& of, const PECommandLineOptions& io) {
 		case PEGrating::TrapezoidalProfile:
 		of << "gratingType=trapezoidal" << std::endl;
 		break;
+		case PEGrating::CustomProfile:
+		of << "gratingType=custom" << std::endl;
+		break;
 		default:
 		of << "gratingType=invalid" << std::endl;
 		break;
@@ -279,12 +309,10 @@ void writeOutputFileHeader(std::ostream& of, const PECommandLineOptions& io) {
 	of << "gratingPeriod=" << io.period << std::endl;
 	
 	of << "gratingGeometry=";
-	for(int i=0;i<8;++i) {
-		if(io.geometry[i] == DBL_MAX)
-			break;
+	for(int i=0,cc=io.geometry.size(); i<cc; ++i) {
 		if(i!=0)
 			of << ",";
-		of << io.geometry[i];
+		of << io.geometry.at(i);
 	}
 	of << std::endl;
 	

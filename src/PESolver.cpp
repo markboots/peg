@@ -1,3 +1,22 @@
+/*
+Copyright 2012 Mark Boots (mark.boots@usask.ca).
+
+This file is part of the Parallel Efficiency of Gratings project ("PEG").
+
+PEG is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+PEG is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with PEG.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include "PESolver.h"
 
 #include <math.h>
@@ -260,7 +279,23 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 	}
 
 	if(printDebugOutput) {
-		std::cout << "Sum of efficiencies (should be <= 1): " << effSum << std::endl;
+		std::cout << "Sum of reflected efficiencies: " << effSum << std::endl;
+
+		// in debugging, let's also compute and sum the transmitted efficiencies:
+		double a = g_.totalHeight();
+		std::vector<gsl_complex> A1(twoNp1_);
+		std::vector<double> e_t(twoNp1_);
+		double sumTransmitted = 0;
+		for(int i=0; i<twoNp1_; i++) {
+			A1[i] = gsl_complex_mul(
+						gsl_matrix_complex_get(S22_, i, N_),
+						gsl_complex_exp(gsl_complex_mul_imag(betaM_[N_],
+															 -a)));
+			e_t[i] = gsl_complex_abs2(A1[i])*GSL_REAL(beta1_[i])/GSL_REAL(betaM_[N_]);
+			sumTransmitted += e_t[i];
+		}
+		std::cout << "Sum of transmitted efficiencies: " << sumTransmitted << std::endl;
+		std::cout << "Total efficiency (should be <= 1): " << sumTransmitted + effSum << std::endl;
 	}
 	
 	return result;

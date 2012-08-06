@@ -28,6 +28,7 @@ Grating specification:
 	Blazed profile: blaze angle (deg),anti-blaze angle (deg)
 	Sinusoidal profile: depth (um)
 	Trapezoial profile: depth (um),valley width (um),blaze angle (deg),anti-blaze angle (deg)
+	Custom profile: depth (um), followed by list of (x,y) points that describe the surface profile y = g(x).  [x followed by y for each].  The points must go from (0,0) to (1,0) inclusive, and will be scaled so that (0,0)->(1,1) maps to (0,0)->(period,depth).  For example, an isosceles triangular profile with a depth of 0.1um would need three points; the list would be: {0.1,0,0,0.5,1,1,0}.
 
 --gratingMaterial <grating substrate material>
 	This should be a name corresponding to a refractive index database filename, ex: Au, Ni, C, SiO2, etc.
@@ -178,6 +179,30 @@ int main(int argc, char** argv) {
 		MPI_Finalize();
 		return -1;
 	}
+
+	if(rank == 0) {
+		if(io.showLegal) {
+			std::cout << "Copyright 2012 Mark Boots (mark.boots@usask.ca).\n\n"
+
+						 "This program is part of the Parallel Efficiency of Gratings project (\"PEG\").\n\n"
+
+						 "PEG is free software: you can redistribute it and/or modify\n"
+						 "it under the terms of the GNU General Public License as published by\n"
+						 "the Free Software Foundation, either version 3 of the License, or\n"
+						 "(at your option) any later version.\n\n"
+
+						 "PEG is distributed in the hope that it will be useful,\n"
+						 "but WITHOUT ANY WARRANTY; without even the implied warranty of\n"
+						 "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n"
+						 "GNU General Public License for more details.\n\n"
+
+						 "You should have received a copy of the GNU General Public License\n"
+						 "along with PEG.  If not, see <http://www.gnu.org/licenses/>.\n\n";
+		}
+		else {
+			std::cout << "PEG  Copyright (C) 2012  Mark Boots (mark.boots@usask.ca)\nThis program comes with ABSOLUTELY NO WARRANTY.\nThis is free software, and you are welcome to redistribute it under certain\nconditions; run with --showLegal for details.\n\n";
+		}
+	}
 	
 	// On Process 0: Open the output file:
 	std::ofstream outputFile;
@@ -231,6 +256,9 @@ int main(int argc, char** argv) {
 		break;
 	case PEGrating::TrapezoidalProfile:
 		grating = new PETrapezoidalGrating(io.period, io.geometry[0], io.geometry[1], io.geometry[2], io.geometry[3], io.material, io.coating, io.coatingThickness);
+		break;
+	case PEGrating::CustomProfile:
+		grating = new PECustomProfileGrating(io.period, io.geometry, io.material);
 		break;
 	default:
 		grating = 0;	// this will never happen; input validation assures one of the valid grating types.

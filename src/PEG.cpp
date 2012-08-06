@@ -1,3 +1,22 @@
+/*
+Copyright 2012 Mark Boots (mark.boots@usask.ca).
+
+This file is part of the Parallel Efficiency of Gratings project ("PEG").
+
+PEG is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+PEG is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with PEG.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include "PEG.h"
 #include "PESolver.h"
 
@@ -40,8 +59,10 @@ PEResult PEGrating::getEff(double incidenceDeg, double wl, const PEMathOptions& 
 }
 
 gsl_complex PEGrating::refractiveIndex(double wl, const std::string& material) {
-//	return gsl_complex_rect(0.993, 0.00754);
-//	return gsl_complex_rect(1.4, -0.);
+	// Override for testing:
+//	return gsl_complex_rect(0.993, 0.00754);	// Pt at 410 eV
+//	return gsl_complex_rect(1.4, -0.);	// plain glass in visible range.
+//	return gsl_complex_rect(0.993, 0);
 
 	// Attempt to open the material database file.
 	std::string fileName = std::string(PEG_MATERIALS_DB_PATH) + std::string("/") + material + std::string(".idx");
@@ -272,8 +293,10 @@ int PEGrating::computeK2StepsAtY_thickCoating(double y, gsl_complex k2_vaccuum, 
 		stepsK2[1] = k2_substrate;
 
 		// validity check:
-		if(stepsX[0] < 0 || stepsX[1] < 0 || stepsX[0] > d || stepsX[1] > d || stepsX[1] < stepsX[0] - 1e-10)
+		if(stepsX[0] < 0 || stepsX[1] < 0 || stepsX[0] > d || stepsX[1] > d || stepsX[1] < stepsX[0] - 1e-10) {
+//			std::cerr << "err 1:" << stepsX[0] << " " << stepsX[1];
 			return -1;
+		}
 		if(stepsX[1] < stepsX[0]) stepsX[1] = stepsX[0];
 
 		return 2;
@@ -291,10 +314,61 @@ int PEGrating::computeK2StepsAtY_thickCoating(double y, gsl_complex k2_vaccuum, 
 		stepsK2[1] = k2_coating;
 
 		// validity check:
-		if(stepsX[0] < 0 || stepsX[1] < 0 || stepsX[0] > d || stepsX[1] > d || stepsX[1] < stepsX[0] - 1e-10)
+		if(stepsX[0] < 0 || stepsX[1] < 0 || stepsX[0] > d || stepsX[1] > d || stepsX[1] < stepsX[0] - 1e-10) {
+//			std::cerr << "err 1:" << stepsX[0] << " " << stepsX[1];
 			return -1;
+		}
 		if(stepsX[1] < stepsX[0]) stepsX[1] = stepsX[0];
 
 		return 2;
 	}
+}
+
+int PECustomProfileGrating::computeK2StepsAtY(double y, gsl_complex k2_vaccuum, gsl_complex k2_substrate, gsl_complex k2_coating, double *stepsX, gsl_complex *stepsK2) const
+{
+	// coatings are not supported.
+	(void)k2_coating;
+	if(coatingThickness_ != 0)
+		return -1;
+
+	if(!isValid())
+		return -1;
+
+	int numCrossings = 0;
+
+	// move along points until y_i > y if searching for an entering point, or y_i <= y if searching for an exit point.
+	for(int i=0,cc=y_.size(); i<cc; ++i) {
+
+		if(numCrossings%2 == 0) {	// looking for an entry point.
+			if(y_[i] > y) {	// found it
+				double slope = (x_[i] - x_[i-1])/(y_[i]-y_[i-1]);
+				double x = x_[i-1] + slope*(y - y_[i-1]);
+
+				stepsK2[numCrossings] = k2_vaccuum;
+				stepsX[numCrossings++] = x;
+			}
+		}
+		else {// looking for an exit point.
+			if(y_[i] <= y) {	// found it
+				double slope = (x_[i] - x_[i-1])/(y_[i]-y_[i-1]);
+				double x = x_[i-1] + slope*(y - y_[i-1]);
+
+				stepsK2[numCrossings] = k2_substrate;
+				stepsX[numCrossings++] = x;
+			}
+		}
+	}
+
+	if(numCrossings%2 != 0)
+		return -1;	// there must be an even number of crossings: none, in-out, in-out-in-out, etc.
+
+	// No crossing: we are above the grating. Homogeneous vacuum.
+	if(numCrossings == 0) {
+		numCrossings = 1;
+		stepsK2[0] = k2_vaccuum;
+		stepsX[0] = 0;
+	}
+
+
+	return numCrossings;
 }
