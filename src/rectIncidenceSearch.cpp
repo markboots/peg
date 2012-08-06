@@ -52,7 +52,11 @@ int main(int argc, char** argv) {
 		PERectangularGrating g(period, height, period*0.5, "Pt");
 		PEResult r = g.getEff(incidence, wl, PEMathOptions(N));
 		// extract 1st-order efficiency
-		double eff = r.eff.at(N + order);
+		double eff = -1;
+		if(r.status == PEResult::Success)
+			eff = r.eff.at(N + order);
+		else
+			std::cout << "Calculation error: WL: " << wl << " Period: " << period << " Height: " << height << " Incidence: " << incidence << std::endl;
 
 		// on root process, create buffer for eff from everyone
 		std::vector<double> allResults;

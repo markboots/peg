@@ -388,7 +388,12 @@ PEResult::Code PESolver::integrateTrialSolutionAlongY(double *w, double yStart, 
 	gsl_odeiv2_driver_free(d);
 
 	if (status != GSL_SUCCESS) {
-		std::cout << "ODE: Integration failure: Code: " << status << std::endl;
+		if(status == GSL_EBADFUNC)
+			std::cout << "ODE: Integration failure: Invalid Geometry. Check your grating geometry specification." << std::endl;
+		else if(status == GSL_FAILURE)
+			std::cout << "ODE: Integration failure: Can't achieve step tolerance required. Try changing the integration tolerance." << std::endl;
+		else
+			std::cout << "ODE: Integration failure: Code: " << status << std::endl;
 		return PEResult::ConvergenceFailure;
 	}
 
