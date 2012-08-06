@@ -44,8 +44,8 @@ int main(int argc, char** argv) {
 		MPI_Barrier(MPI_COMM_WORLD);
 
 		double incidence = 74 + i*0.1;
-		if(rank == 0)
-			std::cout << "Searching incidence: " << incidence << std::endl;
+//		if(rank == 0)
+//			std::cout << "Searching incidence: " << incidence << std::endl;
 
 		// determine depth we should calculate based on MPI rank
 		double height = startingHeight + rank*deltaHeight;
