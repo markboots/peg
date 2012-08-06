@@ -642,7 +642,7 @@ void PESolver::computeLayers()
 	// How many layers do we need?
 	double a = g_.totalHeight();
 
-	double magicNumber = 7;	// should be ln(1e15). However, emperically this is not enough to maintain stability (ex: REIXS LEG).  7 = ln(1e3) seems stable for all tests so far.
+	double magicNumber = 3;	// should be ln(1e15). However, emperically this is not enough to maintain stability (ex: REIXS LEG).  7 = ln(1e3) seems stable for all tests so far.
 
 	// How many layers to use? In order to keep size of exp(i betaM_{±N}) < 1e15 to avoid losing precision in double values compared with unity-size numbers.
 	numLayers_ = std::max( fabs(GSL_IMAG(betaM_[0]))*a/magicNumber, fabs(GSL_IMAG(betaM_[2*N_]))*a/magicNumber );
