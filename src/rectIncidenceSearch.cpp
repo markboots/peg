@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
 	// that's it.
 	if(rank == 0) {
 		std::cout << "WL: " << wl << " Period: " << period << " OptimalIncidence: " << maxIncidence << " Height: " << maxHeight << " Eff: " << maxEff << std::endl;
-		std::cout << "Search time: " << MPI_WTime() - startTime << std::endl;
+		std::cout << "Search time: " << MPI_Wtime() - startTime << std::endl;
 	}
 	
 	// Finalize MPI
