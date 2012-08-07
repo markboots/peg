@@ -35,20 +35,20 @@ int main(int argc, char** argv) {
 
 	double startingHeight = 0.004;
 	double deltaHeight = 0.002;
+	double endingHeight = 0.14;
 
 	double maxEff = 0;
 	double maxIncidence = -1, maxHeight = -1;
 
-	// manual loop over incidence: 74 - 88.8 in 0.1 deg. steps
-	for(int i=0; i<149; ++i) {
-		MPI_Barrier(MPI_COMM_WORLD);
+	// manual loop over heights:
+	for(int i=0,cc=(endingHeight-startingHeight)/deltaHeight+1; i<cc; ++i) {
+//		MPI_Barrier(MPI_COMM_WORLD);
 
-		double incidence = 74 + i*0.1;
-//		if(rank == 0)
-//			std::cout << "Searching incidence: " << incidence << std::endl;
+		double height = startingHeight + i*deltaHeight;
 
-		// determine depth we should calculate based on MPI rank
-		double height = startingHeight + rank*deltaHeight;
+		// determine incidence angle based on MPI rank. Assumes 139 processors.
+		double incidence = 75 + rank*0.1;
+
 		PERectangularGrating g(period, height, period*0.5, "Pt");
 		PEResult r = g.getEff(incidence, wl, PEMathOptions(N));
 		// extract 1st-order efficiency
@@ -67,16 +67,17 @@ int main(int argc, char** argv) {
 		int err = MPI_Gather(&eff, 1, MPI_DOUBLE, allResults.data(), 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 		if(rank == 0) {
-			// look through all heights
+			// look through all incidences
 			for(int j=0; j<commSize; ++j) {
 				if(allResults.at(j) > maxEff) {
 					maxEff = allResults.at(j);
-					maxIncidence = incidence;
-					maxHeight = startingHeight + j*deltaHeight;
+					maxIncidence = 75 + j*0.1;
+					maxHeight = height;
 				}
 			}
 		}
 	}
+
 
 	// that's it.
 	if(rank == 0) {
