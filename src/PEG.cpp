@@ -133,7 +133,7 @@ gsl_complex PEGrating::refractiveIndex(double wl, const std::string& material) {
 	double lowerBeta = beta[lowerIndex];
 	double interpBeta = lowerBeta + interp*(upperBeta - lowerBeta);
 
-	return gsl_complex_rect(1-interpDelta, interpBeta);
+	return gsl_complex_rect(1-interpDelta, 0.9*interpBeta);
 }
 
 
@@ -371,4 +371,18 @@ int PECustomProfileGrating::computeK2StepsAtY(double y, gsl_complex k2_vaccuum, 
 
 
 	return numCrossings;
+}
+
+double PEGrating::roughnessFactor(double sigma, double wl, const std::string &material, double incidence)
+{
+	gsl_complex v = refractiveIndex(wl, material);
+
+	// convert to radians:
+	double sinTheta = sin(incidence * M_PI / 180.0);
+
+	// calculate complex factor
+
+	gsl_complex c = gsl_complex_sqrt(gsl_complex_sub(gsl_complex_mul(v,v), gsl_complex_rect(sinTheta*sinTheta,0)));
+
+	return exp(-pow(4*M_PI*sigma/wl, 2)*sinTheta*GSL_REAL(c));
 }

@@ -387,7 +387,7 @@ void writeOutputFileResult(std::ostream& of, const PEResult& result, const PECom
 	case PEResult::Success:
 		for(int i=0, cc=result.eff.size(); i<cc; ++i) {
 			if(i!=0)
-				of << ",";
+				of << "\t";
 			of << result.eff.at(i);
 		}
 		of << std::endl;
