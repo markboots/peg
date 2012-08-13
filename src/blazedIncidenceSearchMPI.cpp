@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
 			for(int j=0; j<commSize; ++j) {
 				if(allResults.at(j) > maxEff) {
 					maxEff = allResults.at(j);
-					maxIncidence = 75 + j*0.1;
+					maxIncidence = 79 + j*0.1;
 					maxHeight = height;
 				}
 			}
