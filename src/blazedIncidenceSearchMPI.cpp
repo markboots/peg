@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
 		if(r.status == PEResult::Success)
 			eff = r.eff.at(N + order);
 		else
-			std::cout << "Calculation error: WL: " << wl << " Period: " << period << " Height: " << height << " Incidence: " << incidence << std::endl;
+			std::cout << "Calculation error: WL: " << wl << " Period: " << period << " Height: " << height << " Incidence: " << incidence << " Code: " << r.status << std::endl;
 
 		// on root process, create buffer for eff from everyone
 		std::vector<double> allResults;
