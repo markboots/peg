@@ -3,7 +3,7 @@
 CC=mpic++
 CFLAGS=-c -g -Wall -fopenmp
 LDFLAGS=-fopenmp -lgsl -lgslcblas
-SOURCES=mainSerial.cpp mainMPI.cpp PEG.cpp PESolver.cpp PEMainSupport.cpp rectIncidenceSearch.cpp
+SOURCES=mainSerial.cpp mainMPI.cpp PEG.cpp PESolver.cpp PEMainSupport.cpp rectIncidenceSearch.cpp blazedIncidenceSearchMPI.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 
 all: $(SOURCES) pegSerial pegMPI rectIncidenceSearch
@@ -16,6 +16,9 @@ pegMPI: mainMPI.o PEMainSupport.o PEG.o PESolver.o
 
 rectIncidenceSearch: rectIncidenceSearch.o PEG.o PESolver.o
 	$(CC) $(LDFLAGS) rectIncidenceSearch.o PEG.o PESolver.o -o ../$@
+
+blazedIncidenceSearchMPI: blazedIncidenceSearchMPI.o PEG.o PESolver.o
+	$(CC) $(LDFLAGS) blazedIncidenceSearchMPI.o PEG.o PESolver.o -o ../$@
 
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@
