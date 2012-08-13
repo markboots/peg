@@ -63,13 +63,13 @@ int main(int argc, char** argv) {
 	double calc2R[numEvs];
 
 	// Parameters to probe:
-	double blazes[] = {1.8, 1.85, 1.9, 1.95, 2.0, 2.05, 2.1, 2.15};
+	double blazes[] = {1.7, 1.8, 1.85, 1.9, 1.95, 2.0, 2.05, 2.1, 2.15, 2.2, 2.3};
 	double antiBlazes[] = { 3, 5, 7.5, 10, 12.5, 30 };
 	double thicknesses[] = { 1, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5, 4 };	// in nm!
 	double sigmas[] = { 0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.25, 0.3, .4, .5 };
 
-	double period = 1000 / 892.86;	// from PSD measurements
-	double incidence = 87;
+	double period = 1000 / 1187.819;	// from PSD measurements
+	double incidence = 88;
 
 	double bestSSE = std::numeric_limits<double>::infinity();
 	double bestBlaze, bestAntiBlaze, bestThickness, bestSigma, bestScale1, bestScale2;
