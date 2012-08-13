@@ -139,7 +139,7 @@ int main(int argc, char** argv) {
 
 	// final results:
 	std::cout << std::endl;
-	std::cout << "Best:\t" << bestBlaze << "\t" << bestAntiBlaze << "\t" << bestThickness << "\t" << bestSigma << "\t" << bestSSE << std::endl;
+	std::cout << "Best:\t" << bestBlaze << "\t" << bestAntiBlaze << "\t" << bestThickness << "\t" << bestSigma << "\t" << bestScale1 << "\t" << bestScale2 << "\t" << bestSSE << std::endl;
 
 	return 0;
 }
