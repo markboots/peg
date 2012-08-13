@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
 				for(int e=0; e<numEvs; ++e) {
 					PEResult r = g.getEff(incidence, M_HC/eV[e], PEMathOptions(), false, numThreads);
 					if(r.status != PEResult::Success) {
-						std::cout << "Calculation error:" << blaze << " " << antiBlaze << " " << thickness << " " << eV[e] << std::endl;
+						std::cout << "Calculation error:" << blaze << " " << antiBlaze << " " << thickness << " " << eV[e] << " Code: " << r.status << std::endl;
 						calc1[e] = 0;
 						calc2[e] = 0;
 					}
