@@ -24,7 +24,7 @@ impFit: impFit.o PEG.o PESolver.o
 	$(CC) $(LDFLAGS) impFit.o PEG.o PESolver.o -o ../$@
 
 megFit: megFit.o PEG.o PESolver.o
-	$(CC) $(LDFLAGS) impFit.o PEG.o PESolver.o -o ../$@
+	$(CC) $(LDFLAGS) megFit.o PEG.o PESolver.o -o ../$@
 
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@
