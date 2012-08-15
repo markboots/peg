@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
 			double incidence = 85 + j*0.2;
 
 			PEBlazedGrating g(period, height, 30, "Pt");
-			PEResult r = g.getEff(incidence, wl, PEMathOptions(N), false, 4);
+			PEResult r = g.getEff(incidence, wl, 0, PEMathOptions(N), false, 4);
 			// extract 1st-order efficiency
 			double eff = -1;
 			if(r.status == PEResult::Success) {

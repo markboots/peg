@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
 		double incidence = 75 + rank*0.1;
 
 		PERectangularGrating g(period, height, period*0.5, "Pt");
-		PEResult r = g.getEff(incidence, wl, PEMathOptions(N));
+		PEResult r = g.getEff(incidence, wl, 0, PEMathOptions(N));
 		// extract 1st-order efficiency
 		double eff = -1;
 		if(r.status == PEResult::Success)

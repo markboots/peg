@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
 				// At this point, can calculate all the efficiencies
 				PEBlazedGrating g(period, blaze, antiBlaze, "Ni", "NiO", thickness/1000.0);
 				for(int e=0; e<numEvs; ++e) {
-					PEResult r = g.getEff(incidence, M_HC/eV[e], PEMathOptions(), false, numThreads);
+					PEResult r = g.getEff(incidence, M_HC/eV[e], 0, PEMathOptions(), false, numThreads);
 					if(r.status != PEResult::Success) {
 						std::cout << "Calculation error:" << blaze << " " << antiBlaze << " " << thickness << " " << eV[e] << std::endl;
 						calc1[e] = 0;
