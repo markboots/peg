@@ -38,6 +38,8 @@ void PECommandLineOptions::init() {
 	integrationTolerance = 1e-5;	// default: 1e-5 if not provided.
 	coatingThickness = 0;	// default: 0 (no coating) if not provided.
 
+	rmsRoughnessNm = 0;
+
 	showLegal = false;
 }
 
@@ -72,6 +74,7 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 				{"coatingMaterial", required_argument, 0, 21},
 				{"coatingThickness", required_argument, 0, 22},
 				{"showLegal", no_argument, 0, 23},
+				{"rmsRoughnessNm", required_argument, 0, 24},
 				{0, 0, 0, 0}
 			};
 				
@@ -194,6 +197,9 @@ bool PECommandLineOptions::parseFromCommandLine(int argc, char** argv) {
 			case 23: // showLegal
 				showLegal = true;
 				break;
+			case 24: // rmsRoughnessNm
+				rmsRoughnessNm = atof(optarg);
+				break;
 			}
 		} // end of loop over input options.
 				
@@ -241,6 +247,8 @@ bool PECommandLineOptions::isValid() {
 		
 		if(N == INT_MAX) throw "The truncation index --N must be provided.";
 		if(threads < 1) throw "The number of --threads to use for fine parallelization must be a positive number, at least 1.";
+
+		if(rmsRoughnessNm < 0) throw "The RMS roughness must be in nm, larger than or equal to 0.";
 	}
 	
 	catch(const char* errMsg) {

@@ -53,9 +53,9 @@ void PEResult::fromDoubleArray(const double* array) {
 	memcpy(&(eff[0]), array+4, eff.size()*sizeof(double));	
 }
 
-PEResult PEGrating::getEff(double incidenceDeg, double wl, const PEMathOptions& mo, bool printDebugOutput, int numThreads, bool measureTiming) const {
+PEResult PEGrating::getEff(double incidenceDeg, double wl, double rmsRoughnessNm, const PEMathOptions& mo, bool printDebugOutput, int numThreads, bool measureTiming) const {
 	PESolver s(*this, mo, numThreads, measureTiming);
-	return s.getEff(incidenceDeg, wl, printDebugOutput);
+	return s.getEff(incidenceDeg, wl, rmsRoughnessNm, printDebugOutput);
 }
 
 gsl_complex PEGrating::refractiveIndex(double wl, const std::string& material) {
@@ -373,16 +373,19 @@ int PECustomProfileGrating::computeK2StepsAtY(double y, gsl_complex k2_vaccuum, 
 	return numCrossings;
 }
 
-double PEGrating::roughnessFactor(double sigma, double wl, const std::string &material, double incidence)
-{
-	gsl_complex v = refractiveIndex(wl, material);
-
+double PEGrating::roughnessFactor(double sigma, double wl, const gsl_complex &v, double incidence) {
 	// convert to radians:
 	double sinTheta = sin(incidence * M_PI / 180.0);
 
 	// calculate complex factor
-
 	gsl_complex c = gsl_complex_sqrt(gsl_complex_sub(gsl_complex_mul(v,v), gsl_complex_rect(sinTheta*sinTheta,0)));
 
 	return exp(-pow(4*M_PI*sigma/wl, 2)*sinTheta*GSL_REAL(c));
+}
+
+double PEGrating::roughnessFactor(double sigma, double wl, const std::string &material, double incidence)
+{
+	gsl_complex v = refractiveIndex(wl, material);
+
+	return roughnessFactor(sigma, wl, v, incidence);
 }

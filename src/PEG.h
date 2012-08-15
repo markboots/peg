@@ -135,11 +135,12 @@ public:
 
 	/// Returns the roughness correction using the Sinha factor (Reference: http://dx.doi.org/10.1103/PhysRevB.38.2297  (Equation 4.34)).  The RMS roughness \c sigma is in um. (Actual roughnesses are typically in the order of a couple nm, however.) The incidence angle \c incidence is in deg, measured from surface normal.
 	static double roughnessFactor(double sigma, double wl, const std::string& material, double incidence);
+	static double roughnessFactor(double sigma, double wl, const gsl_complex& refractiveIndex, double incidence);
 
 	
 	
 	/// Calculates the grating efficiency at a given incidence angle \c incidenceDeg (degrees) and wavelength \c wl (um). \c numThreads is the number of threads to use for fine parallelization; ideally it should be <= the number of processor cores on your computer / on a single cluster node.
-	PEResult getEff(double incidenceDeg, double wl, const PEMathOptions& mo = PEMathOptions(), bool printDebugOutput = false, int numThreads = 1, bool measureTiming = false) const;
+	PEResult getEff(double incidenceDeg, double wl, double rmsRoughnessNm = 0, const PEMathOptions& mo = PEMathOptions(), bool printDebugOutput = false, int numThreads = 1, bool measureTiming = false) const;
 
 
 	// Detailed geometry

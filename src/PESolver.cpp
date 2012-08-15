@@ -102,7 +102,7 @@ PESolver::~PESolver() {
 }
 
 /// \todo Imp.
-PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput) {
+PEResult PESolver::getEff(double incidenceDeg, double wl, double rmsRoughnessNm, bool printDebugOutput) {
 
 	time_ = omp_get_wtime();
 	
@@ -296,6 +296,12 @@ PEResult PESolver::getEff(double incidenceDeg, double wl, bool printDebugOutput)
 		}
 		std::cout << "Sum of transmitted efficiencies: " << sumTransmitted << std::endl;
 		std::cout << "Total efficiency (should be <= 1): " << sumTransmitted + effSum << std::endl;
+	}
+
+	if(rmsRoughnessNm > 0) {
+		double roughnessFactor = g_.roughnessFactor(rmsRoughnessNm/1000., wl, g_.coatingThickness() > 0 ? v_c_ : v_1_, incidenceDeg);
+		for(int i=0; i<twoNp1_; ++i)
+			result.eff[i] = roughnessFactor*result.eff.at(i);
 	}
 	
 	return result;

@@ -35,7 +35,7 @@ public:
 	~PESolver();
 	
 	/// Calculates the efficiency at incidence angle \c incidenceDeg and wavelength \c wl.  Side effects: sets the refractive index member variable v_1_; modifies the contents of u_, uprime_, alpha_, beta_, etc.
-	PEResult getEff(double incidenceDeg, double wl, bool printDebugOutput = false);
+	PEResult getEff(double incidenceDeg, double wl, double rmsRoughnessNm = 0, bool printDebugOutput = false);
 	
 	
 

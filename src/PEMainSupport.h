@@ -62,6 +62,8 @@ public:
 
 	bool showLegal;
 
+	double rmsRoughnessNm;
+
 	////////////////////////////////
 	
 	/// Default constructor initializes all input variables to recognizable values. Doubles are set to DBL_MAX, and integers are set to INT_MAX.
