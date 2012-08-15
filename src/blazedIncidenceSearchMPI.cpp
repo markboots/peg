@@ -33,9 +33,9 @@ int main(int argc, char** argv) {
 	double order = -1;
 	double N = 15;
 
-	double startingHeight = 0.2;
-	double deltaHeight = 0.1;
-	double endingHeight = 5.4;
+	double startingHeight = 0.1;
+	double deltaHeight = 0.05;
+	double endingHeight = 3.7;
 
 	double maxEff = 0;
 	double maxIncidence = -1, maxHeight = -1;
@@ -46,8 +46,8 @@ int main(int argc, char** argv) {
 
 		double height = startingHeight + i*deltaHeight;
 
-		// determine incidence angle based on MPI rank. Assumes 99 processors.
-		double incidence = 79 + rank*0.1;
+		// determine incidence angle based on MPI rank. Assumes 109 processors.
+		double incidence = 78 + rank*0.1;
 
 		PEBlazedGrating g(period, height, 30, "Pt");
 		PEResult r = g.getEff(incidence, wl, PEMathOptions(N));
@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
 			for(int j=0; j<commSize; ++j) {
 				if(allResults.at(j) > maxEff) {
 					maxEff = allResults.at(j);
-					maxIncidence = 79 + j*0.1;
+					maxIncidence = 78 + j*0.1;
 					maxHeight = height;
 				}
 			}
