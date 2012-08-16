@@ -6,7 +6,7 @@ LDFLAGS=-fopenmp -lgsl -lgslcblas
 SOURCES=mainSerial.cpp mainMPI.cpp PEG.cpp PESolver.cpp PEMainSupport.cpp rectIncidenceSearch.cpp blazedIncidenceSearchMPI.cpp impFit.cpp megFit.cpp legFit.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 
-all: $(SOURCES) pegSerial pegMPI rectIncidenceSearch blazedIncidenceSearchMPI impFit megFit
+all: $(SOURCES) pegSerial pegMPI rectIncidenceSearch blazedIncidenceSearchMPI impFit megFit legFit
 
 pegSerial: mainSerial.o PEMainSupport.o PEG.o PESolver.o
 	$(CC) $(LDFLAGS) mainSerial.o PEMainSupport.o PEG.o PESolver.o -o ../$@
