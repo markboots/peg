@@ -3,7 +3,7 @@
 CC=mpic++
 CFLAGS=-c -g -Wall -fopenmp
 LDFLAGS=-fopenmp -lgsl -lgslcblas
-SOURCES=mainSerial.cpp mainMPI.cpp PEG.cpp PESolver.cpp PEMainSupport.cpp rectIncidenceSearch.cpp blazedIncidenceSearchMPI.cpp impFit.cpp megFit.cpp
+SOURCES=mainSerial.cpp mainMPI.cpp PEG.cpp PESolver.cpp PEMainSupport.cpp rectIncidenceSearch.cpp blazedIncidenceSearchMPI.cpp impFit.cpp megFit.cpp legFit.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 
 all: $(SOURCES) pegSerial pegMPI rectIncidenceSearch blazedIncidenceSearchMPI impFit megFit
@@ -25,6 +25,9 @@ impFit: impFit.o PEG.o PESolver.o
 
 megFit: megFit.o PEG.o PESolver.o
 	$(CC) $(LDFLAGS) megFit.o PEG.o PESolver.o -o ../$@
+
+legFit: legFit.o PEG.o PESolver.o
+	$(CC) $(LDFLAGS) legFit.o PEG.o PESolver.o -o ../$@
 
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@
